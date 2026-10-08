@@ -1,4 +1,5 @@
 import json
+import time
 import streamlit as st
 import database as db
 
@@ -114,7 +115,7 @@ with st.sidebar:
         st.session_state.clear()
         st.rerun()
 
-# Satış Bildirim Mesajı (Balık/Maden satıldığında sayfa düzenini bozmadan bildirim çıkartır)
+# Satış Bildirim Mesajı
 if "sale_message" in st.session_state:
     st.toast(st.session_state.sale_message, icon="✅")
     del st.session_state.sale_message
@@ -150,3 +151,8 @@ with tab_chat:
 
 with tab_leaderboard:
     render_leaderboard_tab()
+
+# --- 3. CANLI SAYAÇ DÖNGÜSÜ (AUTO-REFRESH) ---
+# Ekranda geri sayımların ve zamanın canlı aksı için her 1 saniyede bir sayfayı günceller.
+time.sleep(1)
+st.rerun()
