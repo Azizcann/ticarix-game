@@ -35,7 +35,7 @@ def render_chat_tab():
     st.subheader("💬 Genel Oyuncu Sohbeti")
     st.caption("Tüm oyuncularla anlık olarak sohbet edebilirsin.")
 
-    # 🎨 Yuvarlak Profil Fotoğrafları, Gri İkon ve Büyüme (Zoom) Efekti İçin CSS
+    # 🎨 Yuvarlak Profil Fotoğrafları ve Daha Büyük Zoom Efekti İçin CSS
     st.markdown("""
         <style>
             .chat-avatar-img {
@@ -46,15 +46,15 @@ def render_chat_tab():
                 border: 2px solid #ff4b4b;
                 margin-right: 10px;
                 vertical-align: middle;
-                transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+                transition: transform 0.25s ease-in-out, box-shadow 0.25s ease-in-out;
                 cursor: pointer;
             }
-            /* Üzerine gelince veya tıklandığı hissini veren büyüme efekti */
+            /* Üzerine gelince devasa boyutlara ulaşması için scale oranını artırdık */
             .chat-avatar-img:hover {
-                transform: scale(2.2);
-                z-index: 999;
+                transform: scale(4.5);
+                z-index: 9999;
                 position: relative;
-                box-shadow: 0px 4px 15px rgba(0,0,0,0.5);
+                box-shadow: 0px 6px 20px rgba(0,0,0,0.6);
             }
             .chat-default-avatar {
                 width: 38px;
@@ -71,7 +71,7 @@ def render_chat_tab():
                 transition: transform 0.2s ease-in-out;
             }
             .chat-default-avatar:hover {
-                transform: scale(1.2);
+                transform: scale(1.5);
             }
         </style>
     """, unsafe_allow_html=True)
