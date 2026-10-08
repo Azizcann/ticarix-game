@@ -203,15 +203,15 @@ def save_chat_message(username, message):
     conn.close()
 
 def get_chat_messages(limit=50):
-    """Yalnızca son 5 dakika içerisindeki sohbet mesajlarını getirir."""
+    """Sohbet mesajlarını silinmeden, geçmişe dönük olarak getirir."""
     conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
     
+    # Zaman filtresini kaldırdık, böylece tüm mesajlar kalıcı olarak görünecek
     cursor.execute(
         """
         SELECT username, message, created_at 
         FROM chat_messages 
-        WHERE created_at >= datetime('now', '-5 minutes', 'localtime') 
         ORDER BY id DESC LIMIT ?
         """,
         (limit,)
