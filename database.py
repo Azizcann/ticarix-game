@@ -2,7 +2,6 @@ import sqlite3
 import hashlib
 import json
 import time
-import os
 
 DB_FILE = "ticarix_users.db"
 
@@ -10,7 +9,6 @@ def init_db():
     """Veritabanını ve gerekli tabloları oluşturur."""
     conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
-    # Kullanıcılar Tablosu
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,7 +18,6 @@ def init_db():
             game_data TEXT NOT NULL
         )
     ''')
-    # Ortak Klanlar Tablosu (Global Klan Sistemi)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS clans (
             clan_name TEXT PRIMARY KEY,
@@ -31,13 +28,12 @@ def init_db():
     conn.close()
 
 def hash_password(password):
-    """Şifreleri SHA-256 ile güvenli hale getirir."""
     return hashlib.sha256(password.encode()).hexdigest()
 
 def get_default_game_data():
-    """Yeni kayıt olan bir oyuncunun başlangıç oyun verilerini döndürür."""
+    """Yeni kayıt olan oyuncunun güncellenmiş ekonomik başlangıç verileri."""
     return {
-        "money": 2500,
+        "money": 5000,  # 2.500 TL yerine 5.000 TL başlangıç sermayesi
         "bank_balance": 0,
         "bank_debt": 0,
         "tcmb_policy_rate": 37.0,
@@ -57,14 +53,13 @@ def get_default_game_data():
         "fish_inventory": {"Sazan": 0, "Alabalık": 0, "Levrek": 0, "Somon": 0, "Kalkan": 0, "Kılıç Balığı": 0},
         "fish_last_time": time.time(),
         "shops": {
-            "bakkal": {"name": "Mahalle Bakkalı", "count": 0, "cost": 500, "income": 15},
-            "cafe": {"name": "Sahil Kafe", "count": 0, "cost": 4500, "income": 85},
-            "holding": {"name": "Ticarix Plaza", "count": 0, "cost": 40000, "income": 550}
+            "bakkal": {"name": "Mahalle Bakkalı", "count": 0, "cost": 10000, "income": 150},
+            "cafe": {"name": "Sahil Kafe", "count": 0, "cost": 75000, "income": 1200},
+            "holding": {"name": "Ticarix Plaza", "count": 0, "cost": 500000, "income": 8500}
         }
     }
 
 def is_admin_user(user_id):
-    """Kullanıcının admin/kurucu hesap olup olmadığını kontrol eder."""
     if not user_id:
         return False
     conn = sqlite3.connect(DB_FILE, timeout=10.0)
@@ -75,14 +70,12 @@ def is_admin_user(user_id):
     return row and row[0] == "azizcanakgul8@gmail.com"
 
 def get_admin_buffed_data(current_data):
-    """Admin hesabı için parayı sınırsız yapar."""
     current_data["money"] = 999999999
     current_data["bank_balance"] = 999999999
     current_data["bank_debt"] = 0
     return current_data
 
 def register_user(username, email, password):
-    """Yeni kullanıcı kaydı yapar."""
     try:
         conn = sqlite3.connect(DB_FILE, timeout=10.0)
         cursor = conn.cursor()
@@ -103,7 +96,6 @@ def register_user(username, email, password):
         return False, "Bu kullanıcı adı veya e-posta zaten kullanımda!"
 
 def login_user(identifier, password):
-    """Kullanıcı girişi yapar."""
     conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
     hashed_p = hash_password(password)
@@ -131,7 +123,6 @@ def login_user(identifier, password):
     return user
 
 def save_game_data(user_id, data):
-    """Oyuncunun güncel oyun verilerini veritabanına kalıcı olarak kaydeder."""
     if not user_id:
         return
     if is_admin_user(user_id):
@@ -146,7 +137,6 @@ def save_game_data(user_id, data):
     except Exception as e:
         print(f"Kayıt Hatası: {e}")
 
-# --- GLOBAL KLAN FONKSİYONLARI ---
 def load_all_clans():
     conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
@@ -176,3 +166,4 @@ def delete_clan_from_db(clan_name):
     cursor.execute("DELETE FROM clans WHERE clan_name = ?", (clan_name,))
     conn.commit()
     conn.close()
+   
