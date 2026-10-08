@@ -3,29 +3,6 @@ import database as db
 import os
 import json
 import sqlite3
-import base64
-
-def get_user_avatar_base64(uname):
-    """Kullanıcının profil fotoğrafını güvenli ve hızlı bir şekilde base64'e çevirir."""
-    try:
-        conn = sqlite3.connect(db.DB_FILE, timeout=5.0)
-        cursor = conn.cursor()
-        cursor.execute("SELECT game_data FROM users WHERE username = ?", (uname,))
-        row = cursor.fetchone()
-        conn.close()
-        
-        if row and row[0]:
-            g_data = json.loads(row[0])
-            pic = g_data.get("profile_pic", None)
-            if pic and os.path.exists(pic):
-                with open(pic, "rb") as image_file:
-                    encoded_string = base64.b64encode(image_file.read()).decode()
-                    ext = pic.split(".")[-1].lower()
-                    mime = "image/jpeg" if ext in ["jpg", "jpeg"] else "image/png"
-                    return f"data:{mime};base64,{encoded_string}"
-    except Exception:
-        pass
-    return None
 
 def render_chat_tab():
     """Oyuncular arası genel canlı sohbet panelini çizer."""
@@ -71,11 +48,25 @@ def render_chat_tab():
             st.info("Henüz sohbet mesajı yok. İlk mesajı sen yaz!")
         else:
             for username, msg, msg_time in messages:
-                avatar_data = get_user_avatar_base64(username)
-                
-                # Fotoğraf varsa base64 göster, yoksa gri insan ikonu göster
-                if avatar_data:
-                    avatar_html = f'<img src="{avatar_data}" class="chat-avatar-img">'
+                # Her mesaj için ağır base64 okuması yapmadan doğrudan profil resmi yolunu kontrol edelim
+                avatar_path = None
+                try:
+                    conn = sqlite3.connect(db.DB_FILE, timeout=2.0)
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT game_data FROM users WHERE username = ?", (username,))
+                    row = cursor.fetchone()
+                    conn.close()
+                    if row and row[0]:
+                        g_data = json.loads(row[0])
+                        pic = g_data.get("profile_pic", None)
+                        if pic and os.path.exists(pic):
+                            avatar_path = pic
+                except Exception:
+                    pass
+
+                # Fotoğraf varsa doğrudan dosya yolunu bas, yoksa gri ikon göster
+                if avatar_path:
+                    avatar_html = f'<img src="app/static/{avatar_path}" class="chat-avatar-img" onerror="this.style.display=\'none\';">'
                 else:
                     avatar_html = '<div class="chat-default-avatar">👤</div>'
 
