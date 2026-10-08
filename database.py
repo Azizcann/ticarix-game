@@ -203,11 +203,18 @@ def save_chat_message(username, message):
     conn.close()
 
 def get_chat_messages(limit=50):
-    """Son sohbet mesajlarını getirir."""
+    """Yalnızca son 5 dakika içerisindeki sohbet mesajlarını getirir."""
     conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
+    
+    # SQLite datetime ile son 5 dakika filtresi uygulanır
     cursor.execute(
-        "SELECT username, message, created_at FROM chat_messages ORDER BY id DESC LIMIT ?",
+        """
+        SELECT username, message, created_at 
+        FROM chat_messages 
+        WHERE created_at >= datetime('now', '-5 minutes', 'localtime') 
+        ORDER BY id DESC LIMIT ?
+        """,
         (limit,)
     )
     rows = cursor.fetchall()
