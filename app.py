@@ -51,6 +51,12 @@ if not st.session_state.logged_in and "uid" in st.query_params:
             
             if db.is_admin_user(st.session_state.user_id):
                 g_data = db.get_admin_buffed_data(g_data)
+            
+            # 🛑 Otomatik girişte de offline süreleri sıfırla
+            g_data["active_job"] = None
+            g_data["mine_last_time"] = time.time()
+            g_data["fish_last_time"] = time.time()
+            g_data["last_shop_income_time"] = time.time()
                 
             for key, val in g_data.items():
                 st.session_state[key] = val
@@ -132,6 +138,12 @@ else:
     st.sidebar.markdown(f"🛡️ **Klan:** `{st.session_state.get('user_clan', 'Yok')}`")
     
     if st.sidebar.button("🚪 Çıkış Yap", use_container_width=True):
+        # Çıkışta aktif işleri, kazı/balık ve dükkan gelirini sıfırla
+        st.session_state["active_job"] = None
+        st.session_state["mine_last_time"] = time.time()
+        st.session_state["fish_last_time"] = time.time()
+        st.session_state["last_shop_income_time"] = time.time()
+        
         save_current_game()
         st.session_state.logged_in = False
         st.session_state.user_id = None
@@ -175,7 +187,7 @@ else:
     with tab_leaderboard:
         render_leaderboard_tab()
 
-    # Satış Bildirimi (Madencilik/Balıkçılık sekme sıfırlama hatasını önler)
+    # Satış Bildirimi
     if "sale_message" in st.session_state:
         st.toast(st.session_state.sale_message, icon="✅")
         del st.session_state.sale_message

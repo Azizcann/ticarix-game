@@ -1,6 +1,7 @@
 import streamlit as st
 import json
 from database import register_user, login_user, get_default_game_data
+import time
 
 def render_auth_screen():
     """Giriş ve kayıt ekranını çizer."""
@@ -30,6 +31,12 @@ def render_auth_screen():
                         g_data = json.loads(user[2])
                     except Exception:
                         g_data = get_default_game_data()
+
+                    # 🛑 Offline iken kazı/iş ve dükkan gelirinin birikmesini engelle
+                    g_data["active_job"] = None
+                    g_data["mine_last_time"] = time.time()
+                    g_data["fish_last_time"] = time.time()
+                    g_data["last_shop_income_time"] = time.time()
 
                     for key, val in g_data.items():
                         st.session_state[key] = val
