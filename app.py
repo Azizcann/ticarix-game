@@ -1,29 +1,26 @@
-import streamlit as st
-import time
 import sqlite3
 import json
+import time
+import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
-# Modüllerimizi içe aktarıyoruz
-from database import init_db, save_game_data, load_all_clans, is_admin_user, get_admin_buffed_data, DB_FILE
+import database as db
 from auth import render_auth_screen
 from mining import render_mining_tab, update_mining_progress
 from fishing import render_fishing_tab, update_fishing_progress
 from bank import render_bank_tab, update_bank_interest
 from shops import render_shops_tab, update_shop_income
 from clan import render_clan_tab
+from chat import render_chat_tab
 
-# Sayfa Yapılandırması
 st.set_page_config(
     page_title="Ticarix - Multi-User Economy & Tycoon Game",
     page_icon="🪙",
     layout="wide"
 )
 
-# Veritabanını Başlat
-init_db()
+db.init_db()
 
-# Oturum Durumlarını Tanımla
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "user_id" not in st.session_state:
@@ -31,14 +28,12 @@ if "user_id" not in st.session_state:
 if "username" not in st.session_state:
     st.session_state.username = ""
 
-# Global klan verilerini her açılışta yükle
-st.session_state.clans_db = load_all_clans()
+st.session_state.clans_db = db.load_all_clans()
 
-# 🔗 F5 atıldığında veya sayfa yenilendiğinde URL'de 'uid' varsa oturumu anında kurtar
 if not st.session_state.logged_in and "uid" in st.query_params:
     try:
         saved_uid = int(st.query_params["uid"])
-        conn = sqlite3.connect(DB_FILE, timeout=10.0)
+        conn = sqlite3.connect(db.DB_FILE, timeout=10.0)
         cursor = conn.cursor()
         cursor.execute("SELECT id, username, game_data FROM users WHERE id = ?", (saved_uid,))
         user_row = cursor.fetchone()
@@ -50,19 +45,18 @@ if not st.session_state.logged_in and "uid" in st.query_params:
             st.session_state.username = user_row[1]
             g_data = json.loads(user_row[2])
             
-            if is_admin_user(st.session_state.user_id):
-                g_data = get_admin_buffed_data(g_data)
+            if db.is_admin_user(st.session_state.user_id):
+                g_data = db.get_admin_buffed_data(g_data)
                 
             for key, val in g_data.items():
                 st.session_state[key] = val
-            st.session_state.clans_db = load_all_clans()
+            st.session_state.clans_db = db.load_all_clans()
     except Exception:
         pass
 
 def save_current_game():
-    """O anki st.session_state verilerini veritabanına anında ve kalıcı olarak kaydeder."""
     if st.session_state.logged_in and st.session_state.user_id:
-        if is_admin_user(st.session_state.user_id):
+        if db.is_admin_user(st.session_state.user_id):
             st.session_state.money = 999999999
             st.session_state.bank_balance = 999999999
             st.session_state.bank_debt = 0
@@ -89,13 +83,11 @@ def save_current_game():
             "fish_last_time": st.session_state.fish_last_time,
             "shops": st.session_state.shops
         }
-        save_game_data(st.session_state.user_id, data)
+        db.save_game_data(st.session_state.user_id, data)
 
-# --- ANA AKIŞ ---
 if not st.session_state.logged_in:
     render_auth_screen()
 else:
-    # Her 1 saniyede bir tetiklenen canlı döngü (Arka plan üretimlerini ve otomatik veritabanı kaydını tetikler)
     st_autorefresh(interval=1000, limit=None, key="ticarix_live_clock")
 
     current_t = time.time()
@@ -104,13 +96,11 @@ else:
     update_bank_interest(current_t)
     update_shop_income(current_t)
     
-    # Her döngüde verileri arka planda güvenle veritabanına kaydet
     save_current_game()
 
-    # Üst Bilgi Barı (Navbar)
     st.sidebar.title(f"👤 Oyuncu: {st.session_state.username}")
     
-    if is_admin_user(st.session_state.user_id):
+    if db.is_admin_user(st.session_state.user_id):
         st.sidebar.success("👑 Kurucu (Sınırsız Para) Aktif")
 
     st.sidebar.markdown(f"💰 **Nakit Para:** `{int(st.session_state.money):,} TL`")
@@ -134,8 +124,8 @@ else:
         st.success(st.session_state.sale_message)
         del st.session_state.sale_message
 
-    tab_mine, tab_fish, tab_bank, tab_clan, tab_shops = st.tabs([
-        "⛏️ Madencilik", "🎣 Balıkçılık", "🏦 Merkez Bankası", "🛡️ Klan", "🏢 Dükkanlar"
+    tab_mine, tab_fish, tab_bank, tab_clan, tab_shops, tab_chat = st.tabs([
+        "⛏️ Madencilik", "🎣 Balıkçılık", "🏦 Merkez Bankası", "🛡️ Klan", "🏢 Dükkanlar", "💬 Sohbet"
     ])
 
     with tab_mine:
@@ -152,3 +142,6 @@ else:
 
     with tab_shops:
         render_shops_tab(save_current_game)
+
+    with tab_chat:
+        render_chat_tab()
