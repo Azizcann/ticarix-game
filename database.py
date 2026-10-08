@@ -61,6 +61,7 @@ def get_default_game_data():
         "clan_members": 1,
         "accumulated_shop_money": 0,
         "active_job": None,
+        "profile_pic": None,  # 👈 Profil fotoğrafı yolu eklendi
         "mine_level": 1,
         "mine_xp": 0,
         "mine_inventory": {"Kömür": 0, "Bakır": 0, "Demir": 0, "Gümüş": 0, "Altın": 0, "Elmas": 0},
@@ -207,7 +208,6 @@ def get_chat_messages(limit=50):
     conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
     
-    # Zaman filtresini kaldırdık, böylece tüm mesajlar kalıcı olarak görünecek
     cursor.execute(
         """
         SELECT username, message, created_at 
@@ -222,7 +222,7 @@ def get_chat_messages(limit=50):
 
 # --- SIRALAMA (LİDERLİK TABLOSU) FONKSİYONLARI ---
 def get_top_players(limit=100):
-    """Oyuncuların servetini (Nakit + Banka + Dükkan Değeri - Borç) hesaplayıp ilk 100'ü döndürür."""
+    """Oyuncuların servetini hesaplayıp ilk 100'ü döndürür[cite: 4]."""
     conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
     cursor.execute("SELECT username, game_data FROM users")
@@ -264,7 +264,7 @@ def get_top_players(limit=100):
 
 
 def get_top_clans(limit=100):
-    """Klanları XP değerine göre sıralar."""
+    """Klanları XP değerine göre sıralar[cite: 4]."""
     conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
     cursor.execute("SELECT clan_name, clan_data FROM clans")
@@ -276,10 +276,7 @@ def get_top_clans(limit=100):
         try:
             c_data = json.loads(c_json)
             xp = int(c_data.get("xp", c_data.get("clan_xp", 0)))
-            
-            # Klan lideri / kurucusu kontrolü (Bilinmiyor hatasını önler)
             leader = c_data.get("leader") or c_data.get("owner", "Bilinmiyor")
-            
             members = c_data.get("members", [])
             member_count = len(members) if isinstance(members, list) else 1
 
@@ -297,7 +294,7 @@ def get_top_clans(limit=100):
 
 
 def transfer_money(sender_username, receiver_username, amount):
-    """Bir oyuncudan diğerine güvenli para transferi yapar."""
+    """Bir oyuncudan diğerine güvenli para transferi yapar[cite: 4]."""
     if amount <= 0:
         return False, "Gönderilecek tutar 0'dan büyük olmalıdır!"
         
@@ -308,7 +305,6 @@ def transfer_money(sender_username, receiver_username, amount):
     cursor = conn.cursor()
     
     try:
-        # 1. Gönderenin verilerini al
         cursor.execute("SELECT id, game_data, email FROM users WHERE username = ?", (sender_username,))
         sender_row = cursor.fetchone()
         if not sender_row:
@@ -317,7 +313,6 @@ def transfer_money(sender_username, receiver_username, amount):
         sender_id, sender_g_json, sender_email = sender_row
         sender_data = json.loads(sender_g_json)
         
-        # Admin değilse normal bakiye kontrolü yap
         if sender_email != "azizcanakgul8@gmail.com":
             sender_money = sender_data.get("money", 0)
             if sender_money < amount:
@@ -326,7 +321,6 @@ def transfer_money(sender_username, receiver_username, amount):
         else:
             sender_data = get_admin_buffed_data(sender_data)
             
-        # 2. Alıcının verilerini al (Kullanıcı var mı kontrolü)
         cursor.execute("SELECT id, game_data, email FROM users WHERE username = ?", (receiver_username,))
         receiver_row = cursor.fetchone()
         if not receiver_row:
@@ -335,13 +329,11 @@ def transfer_money(sender_username, receiver_username, amount):
         receiver_id, receiver_g_json, receiver_email = receiver_row
         receiver_data = json.loads(receiver_g_json)
         
-        # 3. Alıcıya parayı ekle
         if receiver_email == "azizcanakgul8@gmail.com":
             receiver_data = get_admin_buffed_data(receiver_data)
         else:
             receiver_data["money"] = receiver_data.get("money", 0) + amount
         
-        # 4. Veritabanına kaydet
         cursor.execute("UPDATE users SET game_data = ? WHERE id = ?", (json.dumps(sender_data, ensure_ascii=False), sender_id))
         cursor.execute("UPDATE users SET game_data = ? WHERE id = ?", (json.dumps(receiver_data, ensure_ascii=False), receiver_id))
         

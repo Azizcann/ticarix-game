@@ -1,6 +1,7 @@
 import sqlite3
 import json
 import time
+import os
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
@@ -84,6 +85,7 @@ def save_current_game():
             "clan_members": st.session_state.get("clan_members", 1),
             "accumulated_shop_money": int(st.session_state.get("accumulated_shop_money", 0)),
             "active_job": st.session_state.get("active_job", None),
+            "profile_pic": st.session_state.get("profile_pic", None),  # 👈 Profil fotoğrafı kaydedildi[cite: 3]
             "mine_level": st.session_state.get("mine_level", 1),
             "mine_xp": st.session_state.get("mine_xp", 0),
             "mine_inventory": st.session_state.get("mine_inventory", {}),
@@ -101,10 +103,10 @@ def save_current_game():
 if not st.session_state.logged_in:
     render_auth_screen()
 else:
-    # 1 Saniyelik Canlı Otomatik Yenileme
+    # 1 Saniyelik Canlı Otomatik Yenileme[cite: 3]
     st_autorefresh(interval=1000, limit=None, key="ticarix_live_clock")
 
-    # 🔄 Veritabanından Anlık Bakiye Senkronizasyonu (Başka oyuncudan para gelirse anında yansısın)
+    # 🔄 Veritabanından Anlık Bakiye Senkronizasyonu[cite: 3]
     try:
         conn = sqlite3.connect(db.DB_FILE, timeout=10.0)
         cursor = conn.cursor()
@@ -119,7 +121,7 @@ else:
     except Exception:
         pass
 
-    # Arka Plan Güncellemeleri
+    # Arka Plan Güncellemeleri[cite: 3]
     current_t = time.time()
     try:
         update_mining_progress(current_t)
@@ -141,7 +143,30 @@ else:
     save_current_game()
 
     # Sol Menü (Sidebar)
-    st.sidebar.title(f"👤 Oyuncu: {st.session_state.username}")
+    
+    # 🖼️ Profil Fotoğrafı Alanı
+    profile_pic_path = st.session_state.get("profile_pic", None)
+    if profile_pic_path and os.path.exists(profile_pic_path):
+        st.sidebar.image(profile_pic_path, width=120, caption="Profil Fotoğrafın")
+    else:
+        st.sidebar.markdown("👤 **Profil Fotoğrafı Yok**")
+
+    with st.sidebar.expander("📷 Fotoğrafı Değiştir"):
+        uploaded_avatar = st.file_uploader("Yeni bir görsel seç (PNG/JPG)", type=["png", "jpg", "jpeg"], key="avatar_upload")
+        if uploaded_avatar is not None:
+            os.makedirs("avatars", exist_ok=True)
+            ext = uploaded_avatar.name.split(".")[-1]
+            save_path = f"avatars/user_{st.session_state.user_id}.{ext}"
+            
+            with open(save_path, "wb") as f:
+                f.write(uploaded_avatar.getbuffer())
+                
+            st.session_state["profile_pic"] = save_path
+            save_current_game()
+            st.success("Profil fotoğrafı güncellendi!")
+            st.rerun()
+
+    st.sidebar.title(f"👤 Oyuncu: {st.session_state.username}")[cite: 3]
     
     if db.is_admin_user(st.session_state.user_id):
         st.sidebar.success("👑 Kurucu (Sınırsız Para) Aktif")
@@ -168,7 +193,7 @@ else:
     st.sidebar.divider()
     st.sidebar.caption("Ticarix v2.0 - Modüler Mimari")
 
-    # Ana Sekmeler
+    # Ana Sekmeler[cite: 3]
     tab_mine, tab_fish, tab_bank, tab_clan, tab_shops, tab_chat, tab_leaderboard = st.tabs([
         "⛏️ Madencilik", 
         "🎣 Balıkçılık", 
@@ -228,7 +253,7 @@ else:
     with tab_leaderboard:
         render_leaderboard_tab()
 
-    # Satış Bildirimi
+    # Satış Bildirimi[cite: 3]
     if "sale_message" in st.session_state:
         st.toast(st.session_state.sale_message, icon="✅")
         del st.session_state.sale_message
