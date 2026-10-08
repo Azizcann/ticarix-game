@@ -37,7 +37,7 @@ def hash_password(password):
 def get_default_game_data():
     """Yeni kayıt olan bir oyuncunun başlangıç oyun verilerini döndürür."""
     return {
-        "money": 5000,  # Başlangıç parası 5.000 TL yapıldı
+        "money": 5000,
         "bank_balance": 0,
         "bank_debt": 0,
         "tcmb_policy_rate": 37.0,
@@ -103,32 +103,32 @@ def register_user(username, email, password):
         return False, "Bu kullanıcı adı veya e-posta zaten kullanımda!"
 
 def login_user(identifier, password):
-    """Kullanıcı girişi yapar."""
+    """Kullanıcı girişi yapar ve standart (user_id, username, game_data_json) döndürür."""
     conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
     hashed_p = hash_password(password)
     
-    cursor.execute("SELECT id, username, email, game_data FROM users WHERE (username = ? OR email = ?) AND password_hash = ?", 
+    cursor.execute("SELECT id, username, game_data, email FROM users WHERE (username = ? OR email = ?) AND password_hash = ?", 
                    (identifier, identifier, hashed_p))
     user = cursor.fetchone()
     conn.close()
     
     if user:
-        user_id, username, email, g_data_json = user
+        user_id, username, g_data_json, email = user
         if email == "azizcanakgul8@gmail.com":
             g_data = json.loads(g_data_json)
             g_data = get_admin_buffed_data(g_data)
-            updated_json = json.dumps(g_data, ensure_ascii=False)
+            g_data_json = json.dumps(g_data, ensure_ascii=False)
             
             conn = sqlite3.connect(DB_FILE, timeout=10.0)
             cursor = conn.cursor()
-            cursor.execute("UPDATE users SET game_data = ? WHERE id = ?", (updated_json, user_id))
+            cursor.execute("UPDATE users SET game_data = ? WHERE id = ?", (g_data_json, user_id))
             conn.commit()
             conn.close()
             
-            return (user_id, username, updated_json)
+        return (user_id, username, g_data_json)
             
-    return user
+    return None
 
 def save_game_data(user_id, data):
     """Oyuncunun güncel oyun verilerini veritabanına kalıcı olarak kaydeder."""

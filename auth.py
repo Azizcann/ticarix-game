@@ -25,7 +25,7 @@ def render_auth_screen():
                     # 🔗 URL parametresine ID'yi sabitle (F5 atılsa bile anında okunur)
                     st.query_params["uid"] = str(user[0])
                     
-                    # Güvenli JSON okuma (Bozuk veya eski verileri patlatmaz)
+                    # Güvenli JSON okuma
                     try:
                         g_data = json.loads(user[2])
                     except Exception:
