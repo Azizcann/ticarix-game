@@ -2,12 +2,13 @@ import sqlite3
 import hashlib
 import json
 import time
+import os
 
 DB_FILE = "ticarix_users.db"
 
 def init_db():
     """Veritabanını ve gerekli tabloları oluşturur."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
     # Kullanıcılar Tablosu
     cursor.execute('''
@@ -19,7 +20,7 @@ def init_db():
             game_data TEXT NOT NULL
         )
     ''')
-    # Ortak Klanlar Tablosu (F5'te silinmemesi için global)
+    # Ortak Klanlar Tablosu (Global Klan Sistemi)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS clans (
             clan_name TEXT PRIMARY KEY,
@@ -66,7 +67,7 @@ def is_admin_user(user_id):
     """Kullanıcının admin/kurucu hesap olup olmadığını kontrol eder."""
     if not user_id:
         return False
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
     cursor.execute("SELECT email FROM users WHERE id = ?", (user_id,))
     row = cursor.fetchone()
@@ -74,7 +75,7 @@ def is_admin_user(user_id):
     return row and row[0] == "azizcanakgul8@gmail.com"
 
 def get_admin_buffed_data(current_data):
-    """Admin hesabı için sadece parayı sınırsız yapar, XP/seviyelere dokunmaz."""
+    """Admin hesabı için parayı sınırsız yapar."""
     current_data["money"] = 999999999
     current_data["bank_balance"] = 999999999
     current_data["bank_debt"] = 0
@@ -83,7 +84,7 @@ def get_admin_buffed_data(current_data):
 def register_user(username, email, password):
     """Yeni kullanıcı kaydı yapar."""
     try:
-        conn = sqlite3.connect(DB_FILE)
+        conn = sqlite3.connect(DB_FILE, timeout=10.0)
         cursor = conn.cursor()
         hashed_p = hash_password(password)
         initial_data = get_default_game_data()
@@ -103,7 +104,7 @@ def register_user(username, email, password):
 
 def login_user(identifier, password):
     """Kullanıcı girişi yapar."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
     hashed_p = hash_password(password)
     
@@ -119,7 +120,7 @@ def login_user(identifier, password):
             g_data = get_admin_buffed_data(g_data)
             updated_json = json.dumps(g_data, ensure_ascii=False)
             
-            conn = sqlite3.connect(DB_FILE)
+            conn = sqlite3.connect(DB_FILE, timeout=10.0)
             cursor = conn.cursor()
             cursor.execute("UPDATE users SET game_data = ? WHERE id = ?", (updated_json, user_id))
             conn.commit()
@@ -130,19 +131,24 @@ def login_user(identifier, password):
     return user
 
 def save_game_data(user_id, data):
-    """Oyuncunun güncel oyun verilerini veritabanına kaydeder."""
+    """Oyuncunun güncel oyun verilerini veritabanına kalıcı olarak kaydeder."""
+    if not user_id:
+        return
     if is_admin_user(user_id):
         data = get_admin_buffed_data(data)
         
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET game_data = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), user_id))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE, timeout=10.0)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET game_data = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), user_id))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Kayıt Hatası: {e}")
 
 # --- GLOBAL KLAN FONKSİYONLARI ---
 def load_all_clans():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
     cursor.execute("SELECT clan_name, clan_data FROM clans")
     rows = cursor.fetchall()
@@ -150,11 +156,14 @@ def load_all_clans():
     
     clans_dict = {}
     for row in rows:
-        clans_dict[row[0]] = json.loads(row[1])
+        try:
+            clans_dict[row[0]] = json.loads(row[1])
+        except Exception:
+            pass
     return clans_dict
 
 def save_clan_to_db(clan_name, clan_data):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
     cursor.execute("INSERT OR REPLACE INTO clans (clan_name, clan_data) VALUES (?, ?)",
                    (clan_name, json.dumps(clan_data, ensure_ascii=False)))
@@ -162,7 +171,7 @@ def save_clan_to_db(clan_name, clan_data):
     conn.close()
 
 def delete_clan_from_db(clan_name):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM clans WHERE clan_name = ?", (clan_name,))
     conn.commit()
