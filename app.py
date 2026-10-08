@@ -191,3 +191,25 @@ else:
     if "sale_message" in st.session_state:
         st.toast(st.session_state.sale_message, icon="✅")
         del st.session_state.sale_message
+        
+st.subheader("💸 Havale & Para Transferi")
+st.caption("Başka bir oyuncunun kullanıcı adını girerek güvenle nakit para transferi yapabilirsiniz.")
+
+with st.form("transfer_form"):
+    alici_adi = st.text_input("Alıcı Kullanıcı Adı", placeholder="Örn: Ahmet123")
+    gonderilecek_tutar = st.number_input("Gönderilecek Tutar (TL)", min_value=1, step=100, value=1000)
+    
+    transfer_onayi = st.form_submit_button("Parayı Gönder", use_container_width=True, type="primary")
+    
+    if transfer_onayi:
+        current_user = st.session_state.get("username")
+        # database'den transfer fonksiyonunu çağırıyoruz
+        basarili, mesaj = database.transfer_money(current_user, alici_adi.strip(), gonderilecek_tutar)
+        
+        if basarili:
+            # İşlem başarılı olursa oturumdaki nakit paranı da anlık güncelleyelim
+            st.session_state.money -= gonderilecek_tutar
+            st.success(mesaj)
+            st.rerun()
+        else:
+            st.error(mesaj)

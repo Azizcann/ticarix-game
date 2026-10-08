@@ -279,7 +279,10 @@ def get_top_clans(limit=100):
         try:
             c_data = json.loads(c_json)
             xp = int(c_data.get("xp", c_data.get("clan_xp", 0)))
-            leader = c_data.get("leader", "Bilinmiyor")
+            
+            # Burada "leader" veya "owner" anahtarını kontrol ediyoruz, hiçbiri yoksa "Bilinmiyor" yazıyor
+            leader = c_data.get("leader") or c_data.get("owner", "Bilinmiyor")
+            
             members = c_data.get("members", [])
             member_count = len(members) if isinstance(members, list) else 1
 
@@ -295,3 +298,55 @@ def get_top_clans(limit=100):
     # XP'ye göre büyükten küçüğe sırala
     clan_list.sort(key=lambda x: x["xp"], reverse=True)
     return clan_list[:limit]
+    
+    
+def transfer_money(sender_username, receiver_username, amount):
+    """Bir oyuncudan diğerine güvenli para transferi yapar."""
+    if amount <= 0:
+        return False, "Gönderilecek tutar 0'dan büyük olmalıdır!"
+        
+    if sender_username.lower() == receiver_username.lower():
+        return False, "Kendine para gönderemezsin!"
+
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    cursor = conn.cursor()
+    
+    try:
+        # 1. Gönderenin verilerini al
+        cursor.execute("SELECT id, game_data FROM users WHERE username = ?", (sender_username,))
+        sender_row = cursor.fetchone()
+        if not sender_row:
+            return False, "Gönderen hesap bulunamadı!"
+            
+        sender_id, sender_g_json = sender_row
+        sender_data = json.loads(sender_g_json)
+        
+        sender_money = sender_data.get("money", 0)
+        if sender_money < amount:
+            return False, f"Yetersiz nakit! Cüzdanında {sender_money:,} TL var."
+            
+        # 2. Alıcının verilerini al (Böyle bir kullanıcı var mı kontrol et)
+        cursor.execute("SELECT id, game_data FROM users WHERE username = ?", (receiver_username,))
+        receiver_row = cursor.fetchone()
+        if not receiver_row:
+            return False, f"'{receiver_username}' adında kayıtlı bir oyuncu bulunamadı! Para boşa gitmedi."
+            
+        receiver_id, receiver_g_json = receiver_row
+        receiver_data = json.loads(receiver_g_json)
+        
+        # 3. Bakiyeleri güncelle
+        sender_data["money"] -= amount
+        receiver_data["money"] = receiver_data.get("money", 0) + amount
+        
+        # 4. Veritabanına kaydet
+        cursor.execute("UPDATE users SET game_data = ? WHERE id = ?", (json.dumps(sender_data, ensure_ascii=False), sender_id))
+        cursor.execute("UPDATE users SET game_data = ? WHERE id = ?", (json.dumps(receiver_data, ensure_ascii=False), receiver_id))
+        
+        conn.commit()
+        return True, f"Başarıyla {receiver_username} adlı oyuncuya {amount:,} TL gönderildi!"
+        
+    except Exception as e:
+        conn.rollback()
+        return False, f"Transfer sırasında bir hata oluştu: {e}"
+    finally:
+        conn.close()
