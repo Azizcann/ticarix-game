@@ -7,10 +7,11 @@ import os
 DB_FILE = "ticarix_users.db"
 
 def init_db():
-    """Veritabanını ve gerekli tabloları oluşturur."""
+    """Veritabanını ve gerekli tüm tabloları sıfırdan/kontrol ederek oluşturur."""
     conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
-    # Kullanıcılar Tablosu
+    
+    # 1. Kullanıcılar Tablosu
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,13 +21,25 @@ def init_db():
             game_data TEXT NOT NULL
         )
     ''')
-    # Ortak Klanlar Tablosu (Global Klan Sistemi)
+    
+    # 2. Global Klanlar Tablosu
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS clans (
             clan_name TEXT PRIMARY KEY,
             clan_data TEXT NOT NULL
         )
     ''')
+    
+    # 3. Genel Sohbet Tablosu
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            message TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
     conn.commit()
     conn.close()
 
@@ -103,7 +116,7 @@ def register_user(username, email, password):
         return False, "Bu kullanıcı adı veya e-posta zaten kullanımda!"
 
 def login_user(identifier, password):
-    """Kullanıcı girişi yapar ve standart (user_id, username, game_data_json) döndürür."""
+    """Kullanıcı girişi yapar ve tam sırasıyla (user_id, username, game_data_json) döndürür."""
     conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
     hashed_p = hash_password(password)
@@ -171,8 +184,3 @@ def save_clan_to_db(clan_name, clan_data):
     conn.close()
 
 def delete_clan_from_db(clan_name):
-    conn = sqlite3.connect(DB_FILE, timeout=10.0)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM clans WHERE clan_name = ?", (clan_name,))
-    conn.commit()
-    conn.close()

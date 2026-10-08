@@ -12,6 +12,7 @@ from fishing import render_fishing_tab, update_fishing_progress
 from bank import render_bank_tab, update_bank_interest
 from shops import render_shops_tab, update_shop_income
 from clan import render_clan_tab
+from chat import render_chat_tab  # Sohbet modülü eklendi
 
 # Sayfa Yapılandırması
 st.set_page_config(
@@ -95,7 +96,7 @@ def save_current_game():
 if not st.session_state.logged_in:
     render_auth_screen()
 else:
-    # Her 1 saniyede bir tetiklenen canlı döngü (Arka plan üretimlerini ve otomatik veritabanı kaydını tetikler)
+    # Her 1 saniyede bir tetiklenen canlı döngü (Arka plan üretimlerini, canlı sohbeti ve otomatik kaydı tetikler)
     st_autorefresh(interval=1000, limit=None, key="ticarix_live_clock")
 
     current_t = time.time()
@@ -134,8 +135,8 @@ else:
         st.success(st.session_state.sale_message)
         del st.session_state.sale_message
 
-    tab_mine, tab_fish, tab_bank, tab_clan, tab_shops = st.tabs([
-        "⛏️ Madencilik", "🎣 Balıkçılık", "🏦 Merkez Bankası", "🛡️ Klan", "🏢 Dükkanlar"
+    tab_mine, tab_fish, tab_bank, tab_clan, tab_shops, tab_chat = st.tabs([
+        "⛏️ Madencilik", "🎣 Balıkçılık", "🏦 Merkez Bankası", "🛡️ Klan", "🏢 Dükkanlar", "💬 Sohbet"
     ])
 
     with tab_mine:
@@ -152,3 +153,6 @@ else:
 
     with tab_shops:
         render_shops_tab(save_current_game)
+
+    with tab_chat:
+        render_chat_tab()
