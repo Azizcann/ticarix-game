@@ -121,10 +121,10 @@ else:
     st.sidebar.divider()
     st.sidebar.caption("Ticarix v2.0 - Modüler Mimari")
 
-    if "sale_message" in st.session_state:
-        st.success(st.session_state.sale_message)
-        del st.session_state.sale_message
-
+   if "sale_message" in st.session_state:
+    st.toast(st.session_state.sale_message, icon="✅")
+    del st.session_state.sale_message
+    
     tab_mine, tab_fish, tab_bank, tab_clan, tab_shops, tab_chat, tab_leaderboard = st.tabs([
         "⛏️ Madencilik", "🎣 Balıkçılık", "🏦 Merkez Bankası", "🛡️ Klan", "🏢 Dükkanlar", "💬 Sohbet", "🏆 Sıralama"
     ])
