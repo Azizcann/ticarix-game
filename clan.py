@@ -18,7 +18,7 @@ def add_clan_xp(username, xp_amount):
             klan_nakli = int(xp_amount * 0.25)
             
             if klan_nakli > 0:
-                klan_bilgi["xp"] += klan_nakli
+                klan_bilgi["xp"] = klan_bilgi.get("xp", 0) + klan_nakli
                 
                 if "member_xp_progress" not in klan_bilgi:
                     klan_bilgi["member_xp_progress"] = {}
@@ -29,6 +29,14 @@ def add_clan_xp(username, xp_amount):
                 # Veritabanına anında kalıcı olarak kaydet
                 save_clan_to_db(aktif_klan, klan_bilgi)
 
+def get_sorted_clans():
+    """Klanları veritabanından çekip Klan XP'sine göre büyükten küçüğe sıralar."""
+    st.session_state.clans_db = load_all_clans()
+    clans_list = list(st.session_state.clans_db.items())
+    # XP değerine göre sırala
+    clans_list.sort(key=lambda x: x[1].get("xp", 0), reverse=True)
+    return clans_list
+
 def render_clan_tab(save_callback):
     """Klan yönetim, kurma, katılma ve klan içi sekmelerin ana paneli."""
     st.subheader("🛡️ Klanlar & Birlik Sistemi")
@@ -36,10 +44,8 @@ def render_clan_tab(save_callback):
     if "user_clan" not in st.session_state:
         st.session_state.user_clan = None  
     
-    # Klanları her render anında veritabanından tazeleyerek çek
-    st.session_state.clans_db = load_all_clans()
-    
     current_username = st.session_state.get("username", "Oyuncu")
+    sorted_clans = get_sorted_clans()
 
     if not st.session_state.user_clan:
         st.info("Henüz bir klana üye değilsin. Yeni bir klan kurabilir veya mevcut klanlara katılarak bonuslar kazanabilirsin!")
@@ -49,7 +55,7 @@ def render_clan_tab(save_callback):
         with tab_kur:
             st.write("### Yeni Klan Oluştur")
             yeni_klan_adi = st.text_input("Klan Adı", placeholder="Örn: Levantenler")
-            kurulus_maliyeti = 50000  # Klan kurma ücreti 50.000 TL yapıldı
+            kurulus_maliyeti = 50000  # Klan kurma ücreti 50.000 TL
             st.caption(f"Klan Kurma Maliyeti: **{kurulus_maliyeti:,} TL**")
             
             if st.button("Klanı Kur ve Lider Ol", use_container_width=True, type="primary"):
@@ -68,7 +74,7 @@ def render_clan_tab(save_callback):
                         "treasury": 0,
                         "salary_active": True,
                         "target_xp": 100,
-                        "salary_amount": 3500,  # Varsayılan üye maaşı 3.500 TL yapıldı
+                        "salary_amount": 3500,  # Varsayılan üye maaşı 3.500 TL
                         "member_xp_progress": {current_username: 0}
                     }
                     # Veritabanına kaydet
@@ -82,18 +88,29 @@ def render_clan_tab(save_callback):
                     st.rerun()
 
         with tab_katil:
-            st.write("### Aktif Klanlar Listesi")
-            if not st.session_state.clans_db:
+            st.write("### Aktif Klanlar Sıralaması")
+            if not sorted_clans:
                 st.warning("Şu anda kurulmuş hiçbir klan bulunmuyor. İlk klanı sen kurabilirsin!")
             else:
-                for k_adi, k_data in st.session_state.clans_db.items():
+                for idx, (k_adi, k_data) in enumerate(sorted_clans, start=1):
+                    if idx == 1:
+                        rank_str = "🥇 1"
+                    elif idx == 2:
+                        rank_str = "🥈 2"
+                    elif idx == 3:
+                        rank_str = "🥉 3"
+                    else:
+                        rank_str = f"#{idx}"
+
                     col1, col2 = st.columns([3, 1])
                     with col1:
-                        st.write(f"**{k_adi}** | Lider: *{k_data['owner']}* | Üye Sayısı: {len(k_data['members'])}")
+                        st.write(f"**{rank_str} {k_adi}** | Lider: *{k_data.get('owner', 'Bilinmiyor')}* | Üye: {len(k_data.get('members', []))} | XP: **{k_data.get('xp', 0):,} XP**")
                     with col2:
                         if st.button(f"Katıl", key=f"join_{k_adi}", use_container_width=True):
-                            if current_username not in k_data["members"]:
-                                k_data["members"].append(current_username)
+                            members = k_data.get("members", [])
+                            if current_username not in members:
+                                members.append(current_username)
+                                k_data["members"] = members
                             if "member_xp_progress" not in k_data:
                                 k_data["member_xp_progress"] = {}
                             if current_username not in k_data["member_xp_progress"]:
@@ -131,12 +148,13 @@ def render_clan_tab(save_callback):
         </div>
     """, unsafe_allow_html=True)
 
-    tab_titles = ["👥 Üye Listesi & XP", "💰 Maaş & Kasa", "📜 Klanlar Listesi"]
+    tab_titles = ["👥 Üye Listesi & XP", "💰 Maaş & Kasa", "📜 Klanlar Sıralaması"]
     if is_owner:
         tab_titles.append("⚙️ Yönetim")
 
     tabs = st.tabs(tab_titles)
 
+    # 1. SEKME: ÜYE LİSTESİ & XP
     with tabs[0]:
         st.write("### Klan Üyeleri ve Kazandıkları XP'ler")
         for idx, member in enumerate(klan_bilgi.get("members", []), 1):
@@ -163,6 +181,7 @@ def render_clan_tab(save_callback):
         else:
             st.info("💡 Klan lideri olduğun için klandan doğrudan ayrılamazsın. Yönetim sekmesinden klanı silebilirsin.")
 
+    # 2. SEKME: MAAŞ & KASA
     with tabs[1]:
         st.write("### Klan Kasası & Maaş Al")
         col_m1, col_m2 = st.columns(2)
@@ -207,14 +226,40 @@ def render_clan_tab(save_callback):
             st.success(f"Tebrikler! Klan kasasından **{salary_amount:,} TL** maaş aldın ve banka hesabına yatırıldı!")
             st.rerun()
 
+    # 3. SEKME: KLANLAR SIRALAMASI
     with tabs[2]:
-        st.write("### Tüm Klanlar Sıralaması")
-        if not st.session_state.clans_db:
+        st.write("### 🏆 Canlı Klan XP Sıralaması")
+        st.caption("Klanlar kazandıkları toplam Klan XP'sine göre sıralanır.")
+        
+        if not sorted_clans:
             st.write("Henüz aktif klan bulunmuyor.")
         else:
-            for k_adi, k_dat in st.session_state.clans_db.items():
-                st.write(f"- **{k_adi}** | Lider: {k_dat['owner']} | Üye: {len(k_dat['members'])} | XP: {k_dat['xp']}")
+            clan_table_data = []
+            for idx, (k_adi, k_dat) in enumerate(sorted_clans, start=1):
+                if idx == 1:
+                    rank_str = "🥇 1"
+                elif idx == 2:
+                    rank_str = "🥈 2"
+                elif idx == 3:
+                    rank_str = "🥉 3"
+                else:
+                    rank_str = f"#{idx}"
 
+                owner_str = k_dat.get("owner") or k_dat.get("leader", "Bilinmiyor")
+                member_cnt = len(k_dat.get("members", []))
+                xp_val = k_dat.get("xp", 0)
+
+                clan_table_data.append({
+                    "Sıra": rank_str,
+                    "Klan Adı": k_adi,
+                    "Lider": owner_str,
+                    "Üye Sayısı": member_cnt,
+                    "Toplam XP": f"{xp_val:,} XP"
+                })
+
+            st.dataframe(clan_table_data, use_container_width=True, hide_index=True)
+
+    # 4. SEKME: YÖNETİM (YALNIZCA LİDER)
     if is_owner:
         with tabs[3]:
             st.write("### ⚙️ Klan Yönetim Paneli (Kurucu Özel)")
