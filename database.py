@@ -207,7 +207,6 @@ def get_chat_messages(limit=50):
     conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
     
-    # SQLite datetime ile son 5 dakika filtresi uygulanır
     cursor.execute(
         """
         SELECT username, message, created_at 
@@ -220,7 +219,8 @@ def get_chat_messages(limit=50):
     rows = cursor.fetchall()
     conn.close()
     return rows[::-1]
-    # --- SIRALAMA (LİDERLİK TABLOSU) FONKSİYONLARI ---
+
+# --- SIRALAMA (LİDERLİK TABLOSU) FONKSİYONLARI ---
 def get_top_players(limit=100):
     """Oyuncuların servetini (Nakit + Banka + Dükkan Değeri - Borç) hesaplayıp ilk 100'ü döndürür."""
     conn = sqlite3.connect(DB_FILE, timeout=10.0)
@@ -237,7 +237,6 @@ def get_top_players(limit=100):
             bank = int(data.get("bank_balance", 0))
             debt = int(data.get("bank_debt", 0))
 
-            # Dükkanların toplam satın alma değerini hesapla
             shops = data.get("shops", {})
             shop_val = 0
             if isinstance(shops, dict):
@@ -247,7 +246,6 @@ def get_top_players(limit=100):
                         cost = shop_info.get("cost", 0)
                         shop_val += cnt * cost
 
-            # Toplam Servet = Nakit + Banka + Dükkan Yatırımı - Borç
             net_wealth = money + bank + shop_val - debt
 
             leaderboard.append({
@@ -261,7 +259,6 @@ def get_top_players(limit=100):
         except Exception:
             continue
 
-    # Servete göre büyükten küçüğe sırala
     leaderboard.sort(key=lambda x: x["total_wealth"], reverse=True)
     return leaderboard[:limit]
 
@@ -280,7 +277,7 @@ def get_top_clans(limit=100):
             c_data = json.loads(c_json)
             xp = int(c_data.get("xp", c_data.get("clan_xp", 0)))
             
-            # Burada "leader" veya "owner" anahtarını kontrol ediyoruz, hiçbiri yoksa "Bilinmiyor" yazıyor
+            # Klan lideri / kurucusu kontrolü (Bilinmiyor hatasını önler)
             leader = c_data.get("leader") or c_data.get("owner", "Bilinmiyor")
             
             members = c_data.get("members", [])
@@ -295,7 +292,6 @@ def get_top_clans(limit=100):
         except Exception:
             continue
 
-    # XP'ye göre büyükten küçüğe sırala
     clan_list.sort(key=lambda x: x["xp"], reverse=True)
     return clan_list[:limit]
 
@@ -313,30 +309,37 @@ def transfer_money(sender_username, receiver_username, amount):
     
     try:
         # 1. Gönderenin verilerini al
-        cursor.execute("SELECT id, game_data FROM users WHERE username = ?", (sender_username,))
+        cursor.execute("SELECT id, game_data, email FROM users WHERE username = ?", (sender_username,))
         sender_row = cursor.fetchone()
         if not sender_row:
             return False, "Gönderen hesap bulunamadı!"
             
-        sender_id, sender_g_json = sender_row
+        sender_id, sender_g_json, sender_email = sender_row
         sender_data = json.loads(sender_g_json)
         
-        sender_money = sender_data.get("money", 0)
-        if sender_money < amount:
-            return False, f"Yetersiz nakit! Cüzdanında {sender_money:,} TL var."
+        # Admin değilse normal bakiye kontrolü yap
+        if sender_email != "azizcanakgul8@gmail.com":
+            sender_money = sender_data.get("money", 0)
+            if sender_money < amount:
+                return False, f"Yetersiz nakit! Cüzdanında {sender_money:,} TL var."
+            sender_data["money"] -= amount
+        else:
+            sender_data = get_admin_buffed_data(sender_data)
             
-        # 2. Alıcının verilerini al (Böyle bir kullanıcı var mı kontrol et)
-        cursor.execute("SELECT id, game_data FROM users WHERE username = ?", (receiver_username,))
+        # 2. Alıcının verilerini al (Kullanıcı var mı kontrolü)
+        cursor.execute("SELECT id, game_data, email FROM users WHERE username = ?", (receiver_username,))
         receiver_row = cursor.fetchone()
         if not receiver_row:
             return False, f"'{receiver_username}' adında kayıtlı bir oyuncu bulunamadı! Para boşa gitmedi."
             
-        receiver_id, receiver_g_json = receiver_row
+        receiver_id, receiver_g_json, receiver_email = receiver_row
         receiver_data = json.loads(receiver_g_json)
         
-        # 3. Bakiyeleri güncelle
-        sender_data["money"] -= amount
-        receiver_data["money"] = receiver_data.get("money", 0) + amount
+        # 3. Alıcıya parayı ekle
+        if receiver_email == "azizcanakgul8@gmail.com":
+            receiver_data = get_admin_buffed_data(receiver_data)
+        else:
+            receiver_data["money"] = receiver_data.get("money", 0) + amount
         
         # 4. Veritabanına kaydet
         cursor.execute("UPDATE users SET game_data = ? WHERE id = ?", (json.dumps(sender_data, ensure_ascii=False), sender_id))
