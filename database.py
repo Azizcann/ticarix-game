@@ -298,8 +298,8 @@ def get_top_clans(limit=100):
     # XP'ye göre büyükten küçüğe sırala
     clan_list.sort(key=lambda x: x["xp"], reverse=True)
     return clan_list[:limit]
-    
-    
+
+
 def transfer_money(sender_username, receiver_username, amount):
     """Bir oyuncudan diğerine güvenli para transferi yapar."""
     if amount <= 0:
