@@ -62,16 +62,50 @@ def get_default_game_data():
         }
     }
 
+def is_admin_user(user_id):
+    """Kullanıcının admin/kurucu hesap olup olmadığını kontrol eder."""
+    if not user_id:
+        return False
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT email FROM users WHERE id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return row and row[0] == "azizcanakgul8@gmail.com"
+
+def get_admin_buffed_data(current_data):
+    """Admin hesabı için her şeyi sınırsız/maksimum yapar."""
+    current_data["money"] = 999999999
+    current_data["bank_balance"] = 999999999
+    current_data["bank_debt"] = 0
+    current_data["mine_level"] = 99
+    current_data["mine_xp"] = 999999
+    for k in current_data["mine_inventory"]:
+        current_data["mine_inventory"][k] = 999999
+    current_data["fish_level"] = 99
+    current_data["fish_xp"] = 999999
+    for k in current_data["fish_inventory"]:
+        current_data["fish_inventory"][k] = 999999
+    for shop_key in current_data["shops"]:
+        current_data["shops"][shop_key]["count"] = 50
+    return current_data
+
 def register_user(username, email, password):
     """Yeni kullanıcı kaydı yapar."""
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         hashed_p = hash_password(password)
-        initial_data = json.dumps(get_default_game_data(), ensure_ascii=False)
+        initial_data = get_default_game_data()
+        
+        # Eğer kayıt olan kişi adminse direkt full güç başlasın
+        if email == "azizcanakgul8@gmail.com":
+            initial_data = get_admin_buffed_data(initial_data)
+
+        initial_data_json = json.dumps(initial_data, ensure_ascii=False)
         
         cursor.execute("INSERT INTO users (username, email, password_hash, game_data) VALUES (?, ?, ?, ?)",
-                       (username, email, hashed_p, initial_data))
+                       (username, email, hashed_p, initial_data_json))
         conn.commit()
         conn.close()
         return True, "Kayıt başarılı!"
@@ -84,14 +118,36 @@ def login_user(identifier, password):
     cursor = conn.cursor()
     hashed_p = hash_password(password)
     
-    cursor.execute("SELECT id, username, game_data FROM users WHERE (username = ? OR email = ?) AND password_hash = ?", 
+    cursor.execute("SELECT id, username, email, game_data FROM users WHERE (username = ? OR email = ?) AND password_hash = ?", 
                    (identifier, identifier, hashed_p))
     user = cursor.fetchone()
     conn.close()
+    
+    # Giriş yapıldığında admin ise verilerini otomatik full'le ve kaydet
+    if user:
+        user_id, username, email, g_data_json = user
+        if email == "azizcanakgul8@gmail.com":
+            g_data = json.loads(g_data_json)
+            g_data = get_admin_buffed_data(g_data)
+            updated_json = json.dumps(g_data, ensure_ascii=False)
+            
+            # Güncel veritabanına işle
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            cursor.execute("UPDATE users SET game_data = ? WHERE id = ?", (updated_json, user_id))
+            conn.commit()
+            conn.close()
+            
+            return (user_id, username, updated_json)
+            
     return user
 
 def save_game_data(user_id, data):
     """Oyuncunun güncel oyun verilerini veritabanına kaydeder."""
+    # Eğer admin ise kaydederken bile her şeyi full tutalım ki eksilmesin
+    if is_admin_user(user_id):
+        data = get_admin_buffed_data(data)
+        
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("UPDATE users SET game_data = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), user_id))
