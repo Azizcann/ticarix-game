@@ -1,6 +1,6 @@
 import streamlit as st
 import json
-from database import register_user, login_user
+from database import register_user, login_user, get_default_game_data
 
 def render_auth_screen():
     """Giriş ve kayıt ekranını çizer."""
@@ -25,7 +25,12 @@ def render_auth_screen():
                     # 🔗 URL parametresine ID'yi sabitle (F5 atılsa bile anında okunur)
                     st.query_params["uid"] = str(user[0])
                     
-                    g_data = json.loads(user[2])
+                    # Güvenli JSON okuma (Bozuk veya eski verileri patlatmaz)
+                    try:
+                        g_data = json.loads(user[2])
+                    except Exception:
+                        g_data = get_default_game_data()
+
                     for key, val in g_data.items():
                         st.session_state[key] = val
                         
