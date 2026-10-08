@@ -1,158 +1,147 @@
+import sqlite3
 import json
 import time
 import streamlit as st
+from streamlit_autorefresh import st_autorefresh
+
 import database as db
-
-# Modül render fonksiyonlarını içe aktar
-from mining import render_mining_tab
-from fishing import render_fishing_tab
-from bank import render_bank_tab
+from auth import render_auth_screen
+from mining import render_mining_tab, update_mining_progress
+from fishing import render_fishing_tab, update_fishing_progress
+from bank import render_bank_tab, update_bank_interest
+from shops import render_shops_tab, update_shop_income
 from clan import render_clan_tab
-from shops import render_shops_tab
 from chat import render_chat_tab
-from leaderboard import render_leaderboard_tab
 
-# Sayfa Yapılandırması
 st.set_page_config(
-    page_title="Ticarix - Ekonomi & Klan Simülasyonu",
-    page_icon="💼",
+    page_title="Ticarix - Multi-User Economy & Tycoon Game",
+    page_icon="🪙",
     layout="wide"
 )
 
-# Veritabanı Tablolarını Başlat
 db.init_db()
 
-# Oturum Durumlarını (Session State) Kontrol Et ve İlklendir
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 if "user_id" not in st.session_state:
     st.session_state.user_id = None
 if "username" not in st.session_state:
-    st.session_state.username = None
+    st.session_state.username = ""
 
+st.session_state.clans_db = db.load_all_clans()
 
-def save_current_user_data():
-    """Oyuncunun güncel oturum verilerini veritabanına kaydeder."""
-    if not st.session_state.user_id:
-        return
-    
-    data_to_save = {
-        "money": st.session_state.get("money", 5000),
-        "bank_balance": st.session_state.get("bank_balance", 0),
-        "bank_debt": st.session_state.get("bank_debt", 0),
-        "user_clan": st.session_state.get("user_clan", None),
-        "clan_members": st.session_state.get("clan_members", 1),
-        "mine_level": st.session_state.get("mine_level", 1),
-        "mine_xp": st.session_state.get("mine_xp", 0),
-        "mine_inventory": st.session_state.get("mine_inventory", {}),
-        "mine_last_time": st.session_state.get("mine_last_time", 0),
-        "fish_level": st.session_state.get("fish_level", 1),
-        "fish_xp": st.session_state.get("fish_xp", 0),
-        "fish_inventory": st.session_state.get("fish_inventory", {}),
-        "fish_last_time": st.session_state.get("fish_last_time", 0),
-        "shops": st.session_state.get("shops", {})
-    }
-    db.save_game_data(st.session_state.user_id, data_to_save)
-
-
-# --- 1. GİRİŞ & KAYIT EKRANI ---
-if not st.session_state.user_id:
-    st.title("💼 Ticarix'e Hoş Geldiniz")
-    st.caption("Multiplayer Ekonomi ve Klan Yönetim Oyunu")
-    
-    tab_login, tab_register = st.tabs(["🔑 Giriş Yap", "📝 Kayıt Ol"])
-    
-    with tab_login:
-        st.subheader("Giriş Yap")
-        login_id = st.text_input("Kullanıcı Adı veya E-Posta", key="login_id")
-        login_pass = st.text_input("Şifre", type="password", key="login_pass")
+if not st.session_state.logged_in and "uid" in st.query_params:
+    try:
+        saved_uid = int(st.query_params["uid"])
+        conn = sqlite3.connect(db.DB_FILE, timeout=10.0)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, username, game_data FROM users WHERE id = ?", (saved_uid,))
+        user_row = cursor.fetchone()
+        conn.close()
         
-        if st.button("Giriş Yap", type="primary", use_container_width=True):
-            user = db.login_user(login_id, login_pass)
-            if user:
-                user_id, username, game_data_json = user
-                st.session_state.user_id = user_id
-                st.session_state.username = username
+        if user_row:
+            st.session_state.logged_in = True
+            st.session_state.user_id = user_row[0]
+            st.session_state.username = user_row[1]
+            g_data = json.loads(user_row[2])
+            
+            if db.is_admin_user(st.session_state.user_id):
+                g_data = db.get_admin_buffed_data(g_data)
                 
-                g_data = json.loads(game_data_json)
-                for key, val in g_data.items():
-                    st.session_state[key] = val
-                    
-                st.success(f"Hoş geldin, {username}!")
-                st.rerun()
-            else:
-                st.error("Kullanıcı adı/e-posta veya şifre hatalı!")
+            for key, val in g_data.items():
+                st.session_state[key] = val
+            st.session_state.clans_db = db.load_all_clans()
+    except Exception:
+        pass
 
-    with tab_register:
-        st.subheader("Yeni Hesap Oluştur")
-        reg_user = st.text_input("Kullanıcı Adı", key="reg_user")
-        reg_email = st.text_input("E-Posta", key="reg_email")
-        reg_pass = st.text_input("Şifre", type="password", key="reg_pass")
-        
-        if st.button("Kayıt Ol", type="primary", use_container_width=True):
-            if not reg_user or not reg_email or not reg_pass:
-                st.warning("Lütfen tüm alanları doldurun!")
-            else:
-                success, msg = db.register_user(reg_user, reg_email, reg_pass)
-                if success:
-                    st.success(msg)
-                else:
-                    st.error(msg)
-    st.stop()
+def save_current_game():
+    if st.session_state.logged_in and st.session_state.user_id:
+        if db.is_admin_user(st.session_state.user_id):
+            st.session_state.money = 999999999
+            st.session_state.bank_balance = 999999999
+            st.session_state.bank_debt = 0
 
+        data = {
+            "money": int(st.session_state.money),
+            "bank_balance": int(st.session_state.bank_balance),
+            "bank_debt": int(st.session_state.bank_debt),
+            "tcmb_policy_rate": st.session_state.tcmb_policy_rate,
+            "last_bank_interest_time": st.session_state.last_bank_interest_time,
+            "last_shop_income_time": st.session_state.last_shop_income_time,
+            "clan_name": st.session_state.get("clan_name", "La Familia"),
+            "user_clan": st.session_state.get("user_clan", None),
+            "clan_members": st.session_state.get("clan_members", 1),
+            "accumulated_shop_money": int(st.session_state.get("accumulated_shop_money", 0)),
+            "active_job": st.session_state.active_job,
+            "mine_level": st.session_state.mine_level,
+            "mine_xp": st.session_state.mine_xp,
+            "mine_inventory": st.session_state.mine_inventory,
+            "mine_last_time": st.session_state.mine_last_time,
+            "fish_level": st.session_state.fish_level,
+            "fish_xp": st.session_state.fish_xp,
+            "fish_inventory": st.session_state.fish_inventory,
+            "fish_last_time": st.session_state.fish_last_time,
+            "shops": st.session_state.shops
+        }
+        db.save_game_data(st.session_state.user_id, data)
 
-# --- 2. OYUN ANA EKRANI (GİRİŞ YAPILMIŞ) ---
+if not st.session_state.logged_in:
+    render_auth_screen()
+else:
+    st_autorefresh(interval=1000, limit=None, key="ticarix_live_clock")
 
-# Yan Menü (Sidebar) Profil Paneli
-with st.sidebar:
-    st.title(f"👤 Oyuncu: {st.session_state.username}")
-    st.write(f"💰 **Nakit Para:** {int(st.session_state.get('money', 0)):,} TL")
-    st.write(f"🏦 **Banka Mevduat:** {int(st.session_state.get('bank_balance', 0)):,} TL")
-    st.write(f"💸 **Banka Borç:** {int(st.session_state.get('bank_debt', 0)):,} TL")
-    st.write(f"🛡️ **Klan:** {st.session_state.get('user_clan') or 'Yok'}")
+    current_t = time.time()
+    update_mining_progress(current_t)
+    update_fishing_progress(current_t)
+    update_bank_interest(current_t)
+    update_shop_income(current_t)
     
-    st.divider()
-    if st.button("🚪 Çıkış Yap", use_container_width=True):
-        save_current_user_data()
-        st.session_state.clear()
+    save_current_game()
+
+    st.sidebar.title(f"👤 Oyuncu: {st.session_state.username}")
+    
+    if db.is_admin_user(st.session_state.user_id):
+        st.sidebar.success("👑 Kurucu (Sınırsız Para) Aktif")
+
+    st.sidebar.markdown(f"💰 **Nakit Para:** `{int(st.session_state.money):,} TL`")
+    st.sidebar.markdown(f"🏦 **Banka Mevduat:** `{int(st.session_state.bank_balance):,} TL`")
+    st.sidebar.markdown(f"📉 **Banka Borç:** `{int(st.session_state.bank_debt):,} TL`")
+    st.sidebar.markdown(f"🛡️ **Klan:** `{st.session_state.get('user_clan', 'Yok')}`")
+    
+    if st.sidebar.button("🚪 Çıkış Yap", use_container_width=True):
+        save_current_game()
+        st.session_state.logged_in = False
+        st.session_state.user_id = None
+        st.session_state.username = ""
+        if "uid" in st.query_params:
+            del st.query_params["uid"]
         st.rerun()
 
-# Satış Bildirim Mesajı
-if "sale_message" in st.session_state:
-    st.toast(st.session_state.sale_message, icon="✅")
-    del st.session_state.sale_message
+    st.sidebar.divider()
+    st.sidebar.caption("Ticarix v2.0 - Modüler Mimari")
 
-# Ana Sekme Yapısı
-tab_mine, tab_fish, tab_bank, tab_clan, tab_shops, tab_chat, tab_leaderboard = st.tabs([
-    "⛏️ Madencilik", 
-    "🎣 Balıkçılık", 
-    "🏦 Merkez Bankası", 
-    "🛡️ Klan", 
-    "🏢 Dükkanlar", 
-    "💬 Sohbet", 
-    "🏆 Sıralama"
-])
+    if "sale_message" in st.session_state:
+        st.success(st.session_state.sale_message)
+        del st.session_state.sale_message
 
-with tab_mine:
-    render_mining_tab(save_current_user_data)
+    tab_mine, tab_fish, tab_bank, tab_clan, tab_shops, tab_chat = st.tabs([
+        "⛏️ Madencilik", "🎣 Balıkçılık", "🏦 Merkez Bankası", "🛡️ Klan", "🏢 Dükkanlar", "💬 Sohbet"
+    ])
 
-with tab_fish:
-    render_fishing_tab(save_current_user_data)
+    with tab_mine:
+        render_mining_tab(save_current_game)
 
-with tab_bank:
-    render_bank_tab(save_current_user_data)
+    with tab_fish:
+        render_fishing_tab(save_current_game)
 
-with tab_clan:
-    render_clan_tab(save_current_user_data)
+    with tab_bank:
+        render_bank_tab(save_current_game)
 
-with tab_shops:
-    render_shops_tab(save_current_user_data)
+    with tab_clan:
+        render_clan_tab(save_current_game)
 
-with tab_chat:
-    render_chat_tab()
+    with tab_shops:
+        render_shops_tab(save_current_game)
 
-with tab_leaderboard:
-    render_leaderboard_tab()
-
-# --- 3. CANLI SAYAÇ DÖNGÜSÜ (AUTO-REFRESH) ---
-# Ekranda geri sayımların ve zamanın canlı aksı için her 1 saniyede bir sayfayı günceller.
-time.sleep(1)
-st.rerun()
+    with tab_chat:
+        render_chat_tab()
