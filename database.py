@@ -74,20 +74,10 @@ def is_admin_user(user_id):
     return row and row[0] == "azizcanakgul8@gmail.com"
 
 def get_admin_buffed_data(current_data):
-    """Admin hesabı için her şeyi sınırsız/maksimum yapar."""
+    """Admin hesabı için sadece parayı sınırsız yapar, XP/seviyelere dokunmaz."""
     current_data["money"] = 999999999
     current_data["bank_balance"] = 999999999
     current_data["bank_debt"] = 0
-    current_data["mine_level"] = 99
-    current_data["mine_xp"] = 999999
-    for k in current_data["mine_inventory"]:
-        current_data["mine_inventory"][k] = 999999
-    current_data["fish_level"] = 99
-    current_data["fish_xp"] = 999999
-    for k in current_data["fish_inventory"]:
-        current_data["fish_inventory"][k] = 999999
-    for shop_key in current_data["shops"]:
-        current_data["shops"][shop_key]["count"] = 50
     return current_data
 
 def register_user(username, email, password):
@@ -98,7 +88,6 @@ def register_user(username, email, password):
         hashed_p = hash_password(password)
         initial_data = get_default_game_data()
         
-        # Eğer kayıt olan kişi adminse direkt full güç başlasın
         if email == "azizcanakgul8@gmail.com":
             initial_data = get_admin_buffed_data(initial_data)
 
@@ -123,7 +112,6 @@ def login_user(identifier, password):
     user = cursor.fetchone()
     conn.close()
     
-    # Giriş yapıldığında admin ise verilerini otomatik full'le ve kaydet
     if user:
         user_id, username, email, g_data_json = user
         if email == "azizcanakgul8@gmail.com":
@@ -131,7 +119,6 @@ def login_user(identifier, password):
             g_data = get_admin_buffed_data(g_data)
             updated_json = json.dumps(g_data, ensure_ascii=False)
             
-            # Güncel veritabanına işle
             conn = sqlite3.connect(DB_FILE)
             cursor = conn.cursor()
             cursor.execute("UPDATE users SET game_data = ? WHERE id = ?", (updated_json, user_id))
@@ -144,7 +131,6 @@ def login_user(identifier, password):
 
 def save_game_data(user_id, data):
     """Oyuncunun güncel oyun verilerini veritabanına kaydeder."""
-    # Eğer admin ise kaydederken bile her şeyi full tutalım ki eksilmesin
     if is_admin_user(user_id):
         data = get_admin_buffed_data(data)
         
@@ -156,7 +142,6 @@ def save_game_data(user_id, data):
 
 # --- GLOBAL KLAN FONKSİYONLARI ---
 def load_all_clans():
-    """Veritabanındaki tüm klanları sözlük olarak yükler."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("SELECT clan_name, clan_data FROM clans")
@@ -169,7 +154,6 @@ def load_all_clans():
     return clans_dict
 
 def save_clan_to_db(clan_name, clan_data):
-    """Tek bir klanın verisini veritabanına kaydeder/günceller."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("INSERT OR REPLACE INTO clans (clan_name, clan_data) VALUES (?, ?)",
@@ -178,7 +162,6 @@ def save_clan_to_db(clan_name, clan_data):
     conn.close()
 
 def delete_clan_from_db(clan_name):
-    """Klanı veritabanından tamamen siler."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM clans WHERE clan_name = ?", (clan_name,))

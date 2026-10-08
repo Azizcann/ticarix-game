@@ -50,13 +50,11 @@ if not st.session_state.logged_in and "uid" in st.query_params:
             st.session_state.username = user_row[1]
             g_data = json.loads(user_row[2])
             
-            # Admin kontrolü ve otomatik fullleme
             if is_admin_user(st.session_state.user_id):
                 g_data = get_admin_buffed_data(g_data)
                 
             for key, val in g_data.items():
                 st.session_state[key] = val
-            # Klan verilerini tekrar tazele
             st.session_state.clans_db = load_all_clans()
     except Exception:
         pass
@@ -64,19 +62,10 @@ if not st.session_state.logged_in and "uid" in st.query_params:
 def save_current_game():
     """O anki st.session_state verilerini veritabanına kaydeder."""
     if st.session_state.logged_in and st.session_state.user_id:
-        # Admin ise verileri kaydetmeden önce tekrar fulleyelim
         if is_admin_user(st.session_state.user_id):
             st.session_state.money = 999999999
             st.session_state.bank_balance = 999999999
             st.session_state.bank_debt = 0
-            st.session_state.mine_level = max(st.session_state.get("mine_level", 1), 99)
-            st.session_state.fish_level = max(st.session_state.get("fish_level", 1), 99)
-            for k in st.session_state.get("mine_inventory", {}):
-                st.session_state.mine_inventory[k] = 999999
-            for k in st.session_state.get("fish_inventory", {}):
-                st.session_state.fish_inventory[k] = 999999
-            for s_key in st.session_state.get("shops", {}):
-                st.session_state.shops[s_key]["count"] = 50
 
         data = {
             "money": int(st.session_state.money),
@@ -119,9 +108,8 @@ else:
     # Üst Bilgi Barı (Navbar)
     st.sidebar.title(f"👤 Oyuncu: {st.session_state.username}")
     
-    # Admin özel rozet gösterimi
     if is_admin_user(st.session_state.user_id):
-        st.sidebar.success("👑 Kurucu (Sınırsız Güç) Aktif")
+        st.sidebar.success("👑 Kurucu (Sınırsız Para) Aktif")
 
     st.sidebar.markdown(f"💰 **Nakit Para:** `{int(st.session_state.money):,} TL`")
     st.sidebar.markdown(f"🏦 **Banka Mevduat:** `{int(st.session_state.bank_balance):,} TL`")
