@@ -1,5 +1,6 @@
 import streamlit as st
 import time
+from database import is_admin_user
 
 def render_bank_tab(save_callback):
     """Merkez Bankası, mevduat ve kredi işlemlerini yöneten arayüz."""
@@ -15,19 +16,23 @@ def render_bank_tab(save_callback):
 
     st.info("⏰ **Zaman Algısı:** 1 Gerçek Saat = 1 Oyun Ayı (Faizler bu ölçekte bileşik olarak işler).")
 
-    with st.expander("🔄 Merkez Bankası Piyasa Güncellemesi"):
-        yeni_faiz = st.slider(
-            "Politika Faizi Oranını Belirle (%)", 
-            min_value=10.0, 
-            max_value=70.0, 
-            value=float(st.session_state.tcmb_policy_rate), 
-            step=0.5
-        )
-        if st.button("Faiz Oranını Güncelle", use_container_width=True):
-            st.session_state.tcmb_policy_rate = yeni_faiz
-            save_callback()
-            st.success(f"Merkez Bankası politika faizi %{yeni_faiz} olarak güncellendi!")
-            st.rerun()
+    # Sadece admin hesapları politika faizini değiştirebilir
+    if is_admin_user(st.session_state.get("user_id")):
+        with st.expander("🔄 Merkez Bankası Piyasa Güncellemesi (Admin Özel)"):
+            yeni_faiz = st.slider(
+                "Politika Faizi Oranını Belirle (%)", 
+                min_value=10.0, 
+                max_value=70.0, 
+                value=float(st.session_state.tcmb_policy_rate), 
+                step=0.5
+            )
+            if st.button("Faiz Oranını Güncelle", use_container_width=True):
+                st.session_state.tcmb_policy_rate = yeni_faiz
+                save_callback()
+                st.success(f"Merkez Bankası politika faizi %{yeni_faiz} olarak güncellendi!")
+                st.rerun()
+    else:
+        st.caption("ℹ️ Merkez Bankası politika faizi yalnızca kurucu (admin) tarafından değiştirilebilir.")
 
     st.divider()
     
