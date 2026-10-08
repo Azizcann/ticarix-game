@@ -1,7 +1,7 @@
-import streamlit as st
-import time
 import sqlite3
 import json
+import time
+import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
 # Modüllerimizi içe aktarıyoruz
@@ -12,7 +12,7 @@ from fishing import render_fishing_tab, update_fishing_progress
 from bank import render_bank_tab, update_bank_interest
 from shops import render_shops_tab, update_shop_income
 from clan import render_clan_tab
-from chat import render_chat_tab  # Sohbet modülü eklendi
+from chat import render_chat_tab
 
 # Sayfa Yapılandırması
 st.set_page_config(
