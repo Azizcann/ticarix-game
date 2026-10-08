@@ -5,29 +5,30 @@ import json
 import sqlite3
 import base64
 
-def get_user_avatar_by_username(uname):
-    """Veritabanından kullanıcının profil fotoğrafını okuyup base64 formatına çevirir (Tarayıcıda sorunsuz görünmesi için)."""
+@st.cache_data(ttl=5)
+def get_all_user_avatars():
+    """Tüm kullanıcıların profil fotoğraflarını tek seferde önbelleğe alır (Performans ve hız için)."""
+    avatars = {}
     try:
         conn = sqlite3.connect(db.DB_FILE, timeout=10.0)
         cursor = conn.cursor()
-        cursor.execute("SELECT game_data FROM users WHERE username = ?", (uname,))
-        row = cursor.fetchone()
+        cursor.execute("SELECT username, game_data FROM users")
+        rows = cursor.fetchall()
         conn.close()
-        if row and row[0]:
-            g_data = json.loads(row[0])
-            pic = g_data.get("profile_pic", None)
-            if pic and os.path.exists(pic):
-                with open(pic, "rb") as image_file:
-                    encoded_string = base64.b64encode(image_file.read()).decode()
-                    ext = pic.split(".")[-1].lower()
-                    if ext == "jpg" or ext == "jpeg":
-                        mime = "image/jpeg"
-                    else:
-                        mime = "image/png"
-                    return f"data:{mime};base64,{encoded_string}"
+        
+        for uname, g_json in rows:
+            if g_json:
+                g_data = json.loads(g_json)
+                pic = g_data.get("profile_pic", None)
+                if pic and os.path.exists(pic):
+                    with open(pic, "rb") as image_file:
+                        encoded_string = base64.b64encode(image_file.read()).decode()
+                        ext = pic.split(".")[-1].lower()
+                        mime = "image/jpeg" if ext in ["jpg", "jpeg"] else "image/png"
+                        avatars[uname] = f"data:{mime};base64,{encoded_string}"
     except Exception:
         pass
-    return None
+    return avatars
 
 def render_chat_tab():
     """Oyuncular arası genel canlı sohbet panelini çizer."""
@@ -65,15 +66,18 @@ def render_chat_tab():
     # Sohbet akış alanı
     chat_container = st.container(height=400)
 
-    # Son 50 mesajı çek
+    # Avatar verilerini tek seferde önbellekten çek
+    all_avatars = get_all_user_avatars()
+
+    # Son 50 mesajı çek[cite: 7]
     messages = db.get_chat_messages(limit=50)
 
     with chat_container:
         if not messages:
-            st.info("Henüz sohbet mesajı yok. İlk mesajı sen yaz!")
+            st.info("Henüz sohbet mesajı yok. İlk mesajı sen yaz!")[cite: 7]
         else:
             for username, msg, msg_time in messages:
-                avatar_data = get_user_avatar_by_username(username)
+                avatar_data = all_avatars.get(username)
                 
                 # Fotoğraf varsa base64 göster, yoksa gri insan ikonu göster
                 if avatar_data:
@@ -91,9 +95,9 @@ def render_chat_tab():
                     </div>
                 """, unsafe_allow_html=True)
 
-    # Mesaj Girdisi
+    # Mesaj Girdisi[cite: 7]
     prompt = st.chat_input("Mesajını yaz ve Enter'a bas...")
     if prompt:
-        current_username = st.session_state.get("username", "Oyuncu")
-        db.save_chat_message(current_username, prompt)
-        st.rerun()
+        current_username = st.session_state.get("username", "Oyuncu")[cite: 7]
+        db.save_chat_message(current_username, prompt)[cite: 7]
+        st.rerun()[cite: 7]
