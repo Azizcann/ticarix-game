@@ -3,9 +3,10 @@ import time
 import random
 from clan import add_clan_xp
 
+# Güncellenmiş Maden Fiyat Listesi
 ORE_TYPES = [
-    ("Kömür", 20, 1), ("Bakır", 50, 1), ("Demir", 120, 3),
-    ("Gümüş", 300, 5), ("Altın", 800, 8), ("Elmas", 2000, 10)
+    ("Kömür", 50, 1), ("Bakır", 150, 1), ("Demir", 400, 3),
+    ("Gümüş", 1200, 5), ("Altın", 3500, 8), ("Elmas", 10000, 10)
 ]
 
 def render_mining_tab(save_callback):

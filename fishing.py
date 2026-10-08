@@ -3,9 +3,10 @@ import time
 import random
 from clan import add_clan_xp
 
+# Güncellenmiş Balık Fiyat Listesi
 FISH_TYPES = [
-    ("Sazan", 20, 1), ("Alabalık", 50, 1), ("Levrek", 120, 3),
-    ("Somon", 300, 5), ("Kalkan", 800, 8), ("Kılıç Balığı", 2000, 10)
+    ("Sazan", 40, 1), ("Alabalık", 120, 1), ("Levrek", 350, 3),
+    ("Somon", 1000, 5), ("Kalkan", 3000, 8), ("Kılıç Balığı", 8500, 10)
 ]
 
 def render_fishing_tab(save_callback):

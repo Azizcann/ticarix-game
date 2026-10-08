@@ -37,7 +37,7 @@ def hash_password(password):
 def get_default_game_data():
     """Yeni kayıt olan bir oyuncunun başlangıç oyun verilerini döndürür."""
     return {
-        "money": 2500,
+        "money": 5000,  # Başlangıç parası 5.000 TL yapıldı
         "bank_balance": 0,
         "bank_debt": 0,
         "tcmb_policy_rate": 37.0,
@@ -57,9 +57,9 @@ def get_default_game_data():
         "fish_inventory": {"Sazan": 0, "Alabalık": 0, "Levrek": 0, "Somon": 0, "Kalkan": 0, "Kılıç Balığı": 0},
         "fish_last_time": time.time(),
         "shops": {
-            "bakkal": {"name": "Mahalle Bakkalı", "count": 0, "cost": 500, "income": 15},
-            "cafe": {"name": "Sahil Kafe", "count": 0, "cost": 4500, "income": 85},
-            "holding": {"name": "Ticarix Plaza", "count": 0, "cost": 40000, "income": 550}
+            "bakkal": {"name": "Mahalle Bakkalı", "count": 0, "cost": 10000, "income": 150},
+            "cafe": {"name": "Sahil Kafe", "count": 0, "cost": 75000, "income": 1200},
+            "holding": {"name": "Ticarix Plaza", "count": 0, "cost": 500000, "income": 8500}
         }
     }
 

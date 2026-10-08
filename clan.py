@@ -49,14 +49,14 @@ def render_clan_tab(save_callback):
         with tab_kur:
             st.write("### Yeni Klan Oluştur")
             yeni_klan_adi = st.text_input("Klan Adı", placeholder="Örn: Levantenler")
-            kurulus_maliyeti = 5000
+            kurulus_maliyeti = 50000  # Klan kurma ücreti 50.000 TL yapıldı
             st.caption(f"Klan Kurma Maliyeti: **{kurulus_maliyeti:,} TL**")
             
             if st.button("Klanı Kur ve Lider Ol", use_container_width=True, type="primary"):
                 if not yeni_klan_adi.strip():
                     st.warning("Lütfen geçerli bir klan adı gir!")
                 elif st.session_state.get("money", 0) < kurulus_maliyeti:
-                    st.error("Yeterli nakit paran yok! (Gerekli: 5,000 TL)")
+                    st.error("Yeterli nakit paran yok! (Gerekli: 50,000 TL)")
                 elif yeni_klan_adi in st.session_state.clans_db:
                     st.error("Bu isimde bir klan zaten mevcut!")
                 else:
@@ -68,7 +68,7 @@ def render_clan_tab(save_callback):
                         "treasury": 0,
                         "salary_active": True,
                         "target_xp": 100,
-                        "salary_amount": 250,
+                        "salary_amount": 3500,  # Varsayılan üye maaşı 3.500 TL yapıldı
                         "member_xp_progress": {current_username: 0}
                     }
                     # Veritabanına kaydet
@@ -119,7 +119,7 @@ def render_clan_tab(save_callback):
 
     if "salary_active" not in klan_bilgi: klan_bilgi["salary_active"] = True
     if "target_xp" not in klan_bilgi: klan_bilgi["target_xp"] = 100
-    if "salary_amount" not in klan_bilgi: klan_bilgi["salary_amount"] = 250
+    if "salary_amount" not in klan_bilgi: klan_bilgi["salary_amount"] = 3500
     if "member_xp_progress" not in klan_bilgi: klan_bilgi["member_xp_progress"] = {}
     if current_username not in klan_bilgi["member_xp_progress"]:
         klan_bilgi["member_xp_progress"][current_username] = 0
@@ -174,7 +174,7 @@ def render_clan_tab(save_callback):
         st.divider()
         
         target_xp = klan_bilgi.get("target_xp", 100)
-        salary_amount = int(klan_bilgi.get("salary_amount", 250))
+        salary_amount = int(klan_bilgi.get("salary_amount", 3500))
         user_current_p = klan_bilgi["member_xp_progress"].get(current_username, 0)
         
         st.write(f"- **Hedeflenen Klan XP Eşiği:** {target_xp:,} XP")
@@ -238,7 +238,7 @@ def render_clan_tab(save_callback):
             
             yeni_salary_active = st.toggle("Maaş Dağıtımı Aktif mi?", value=klan_bilgi.get("salary_active", True))
             yeni_target_db = int(st.number_input("Hedef Klan XP Eşiği", min_value=10, value=int(klan_bilgi.get("target_xp", 100)), step=50))
-            yeni_salary_amount = int(st.number_input("Üye Başına Verilecek Maaş (TL)", min_value=0, value=int(klan_bilgi.get("salary_amount", 250)), step=50))
+            yeni_salary_amount = int(st.number_input("Üye Başına Verilecek Maaş (TL)", min_value=0, value=int(klan_bilgi.get("salary_amount", 3500)), step=500))
 
             if st.button("Ayarları Güncelle", use_container_width=True):
                 klan_bilgi["salary_active"] = yeni_salary_active
