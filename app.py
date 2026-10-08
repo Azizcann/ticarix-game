@@ -1,8 +1,10 @@
+import streamlit as st
+import time
 import sqlite3
 import json
-import time
-import streamlit as st
 from streamlit_autorefresh import st_autorefresh
+
+# Modüllerimizi içe aktarıyoruz
 from database import init_db, save_game_data, load_all_clans, is_admin_user, get_admin_buffed_data, DB_FILE
 from auth import render_auth_screen
 from mining import render_mining_tab, update_mining_progress
@@ -10,16 +12,19 @@ from fishing import render_fishing_tab, update_fishing_progress
 from bank import render_bank_tab, update_bank_interest
 from shops import render_shops_tab, update_shop_income
 from clan import render_clan_tab
-from chat import render_chat_tab
+from chat import render_chat_tab  # Sohbet modülü eklendi
 
+# Sayfa Yapılandırması
 st.set_page_config(
     page_title="Ticarix - Multi-User Economy & Tycoon Game",
     page_icon="🪙",
     layout="wide"
 )
 
+# Veritabanını Başlat
 init_db()
 
+# Oturum Durumlarını Tanımla
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "user_id" not in st.session_state:
@@ -27,8 +32,10 @@ if "user_id" not in st.session_state:
 if "username" not in st.session_state:
     st.session_state.username = ""
 
+# Global klan verilerini her açılışta yükle
 st.session_state.clans_db = load_all_clans()
 
+# 🔗 F5 atıldığında veya sayfa yenilendiğinde URL'de 'uid' varsa oturumu anında kurtar
 if not st.session_state.logged_in and "uid" in st.query_params:
     try:
         saved_uid = int(st.query_params["uid"])
@@ -54,6 +61,7 @@ if not st.session_state.logged_in and "uid" in st.query_params:
         pass
 
 def save_current_game():
+    """O anki st.session_state verilerini veritabanına anında ve kalıcı olarak kaydeder."""
     if st.session_state.logged_in and st.session_state.user_id:
         if is_admin_user(st.session_state.user_id):
             st.session_state.money = 999999999
@@ -84,9 +92,11 @@ def save_current_game():
         }
         save_game_data(st.session_state.user_id, data)
 
+# --- ANA AKIŞ ---
 if not st.session_state.logged_in:
     render_auth_screen()
 else:
+    # Her 1 saniyede bir tetiklenen canlı döngü (Arka plan üretimlerini, canlı sohbeti ve otomatik kaydı tetikler)
     st_autorefresh(interval=1000, limit=None, key="ticarix_live_clock")
 
     current_t = time.time()
@@ -95,8 +105,10 @@ else:
     update_bank_interest(current_t)
     update_shop_income(current_t)
     
+    # Her döngüde verileri arka planda güvenle veritabanına kaydet
     save_current_game()
 
+    # Üst Bilgi Barı (Navbar)
     st.sidebar.title(f"👤 Oyuncu: {st.session_state.username}")
     
     if is_admin_user(st.session_state.user_id):
