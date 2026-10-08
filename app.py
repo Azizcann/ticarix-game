@@ -12,6 +12,7 @@ from bank import render_bank_tab, update_bank_interest
 from shops import render_shops_tab, update_shop_income
 from clan import render_clan_tab
 from chat import render_chat_tab
+from leaderboard import render_leaderboard_tab
 
 st.set_page_config(
     page_title="Ticarix - Multi-User Economy & Tycoon Game",
@@ -124,8 +125,8 @@ else:
         st.success(st.session_state.sale_message)
         del st.session_state.sale_message
 
-    tab_mine, tab_fish, tab_bank, tab_clan, tab_shops, tab_chat = st.tabs([
-        "⛏️ Madencilik", "🎣 Balıkçılık", "🏦 Merkez Bankası", "🛡️ Klan", "🏢 Dükkanlar", "💬 Sohbet"
+    tab_mine, tab_fish, tab_bank, tab_clan, tab_shops, tab_chat, tab_leaderboard = st.tabs([
+        "⛏️ Madencilik", "🎣 Balıkçılık", "🏦 Merkez Bankası", "🛡️ Klan", "🏢 Dükkanlar", "💬 Sohbet", "🏆 Sıralama"
     ])
 
     with tab_mine:
@@ -145,3 +146,6 @@ else:
 
     with tab_chat:
         render_chat_tab()
+        
+    with tab_leaderboard:
+        render_leaderboard_tab()

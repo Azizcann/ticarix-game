@@ -213,3 +213,78 @@ def get_chat_messages(limit=50):
     rows = cursor.fetchall()
     conn.close()
     return rows[::-1]
+    # --- SIRALAMA (LİDERLİK TABLOSU) FONKSİYONLARI ---
+def get_top_players(limit=100):
+    """Oyuncuların servetini (Nakit + Banka + Dükkan Değeri - Borç) hesaplayıp ilk 100'ü döndürür."""
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    cursor = conn.cursor()
+    cursor.execute("SELECT username, game_data FROM users")
+    rows = cursor.fetchall()
+    conn.close()
+
+    leaderboard = []
+    for username, g_json in rows:
+        try:
+            data = json.loads(g_json)
+            money = int(data.get("money", 0))
+            bank = int(data.get("bank_balance", 0))
+            debt = int(data.get("bank_debt", 0))
+
+            # Dükkanların toplam satın alma değerini hesapla
+            shops = data.get("shops", {})
+            shop_val = 0
+            if isinstance(shops, dict):
+                for shop_info in shops.values():
+                    if isinstance(shop_info, dict):
+                        cnt = shop_info.get("count", 0)
+                        cost = shop_info.get("cost", 0)
+                        shop_val += cnt * cost
+
+            # Toplam Servet = Nakit + Banka + Dükkan Yatırımı - Borç
+            net_wealth = money + bank + shop_val - debt
+
+            leaderboard.append({
+                "username": username,
+                "money": money,
+                "bank": bank,
+                "shop_value": shop_val,
+                "total_wealth": net_wealth,
+                "clan": data.get("user_clan") or "Klanı Yok"
+            })
+        except Exception:
+            continue
+
+    # Servete göre büyükten küçüğe sırala
+    leaderboard.sort(key=lambda x: x["total_wealth"], reverse=True)
+    return leaderboard[:limit]
+
+
+def get_top_clans(limit=100):
+    """Klanları XP değerine göre sıralar."""
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    cursor = conn.cursor()
+    cursor.execute("SELECT clan_name, clan_data FROM clans")
+    rows = cursor.fetchall()
+    conn.close()
+
+    clan_list = []
+    for c_name, c_json in rows:
+        try:
+            c_data = json.loads(c_json)
+            xp = int(c_data.get("xp", c_data.get("clan_xp", 0)))
+            leader = c_data.get("leader", "Bilinmiyor")
+            members = c_data.get("members", [])
+            member_count = len(members) if isinstance(members, list) else 1
+
+            clan_list.append({
+                "clan_name": c_name,
+                "leader": leader,
+                "member_count": member_count,
+                "xp": xp
+            })
+        except Exception:
+            continue
+
+    # XP'ye göre büyükten küçüğe sırala
+    clan_list.sort(key=lambda x: x["xp"], reverse=True)
+    return clan_list[:limit]
