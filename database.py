@@ -166,4 +166,3 @@ def delete_clan_from_db(clan_name):
     cursor.execute("DELETE FROM clans WHERE clan_name = ?", (clan_name,))
     conn.commit()
     conn.close()
-   

@@ -34,11 +34,11 @@ if "username" not in st.session_state:
 # Global klan verilerini her açılışta yükle
 st.session_state.clans_db = load_all_clans()
 
-# 🔗 F5 atıldığında veya sayfa yenilendiğinde URL'de 'uid' varsa oturumu anında kurtar
+# 🔗 F5 atıldığında URL'de 'uid' varsa saniyesinde oturumu kurtar
 if not st.session_state.logged_in and "uid" in st.query_params:
     try:
         saved_uid = int(st.query_params["uid"])
-        conn = sqlite3.connect(DB_FILE, timeout=10.0)
+        conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute("SELECT id, username, game_data FROM users WHERE id = ?", (saved_uid,))
         user_row = cursor.fetchone()
@@ -60,7 +60,7 @@ if not st.session_state.logged_in and "uid" in st.query_params:
         pass
 
 def save_current_game():
-    """O anki st.session_state verilerini veritabanına anında ve kalıcı olarak kaydeder."""
+    """O anki st.session_state verilerini veritabanına kaydeder."""
     if st.session_state.logged_in and st.session_state.user_id:
         if is_admin_user(st.session_state.user_id):
             st.session_state.money = 999999999
@@ -95,7 +95,6 @@ def save_current_game():
 if not st.session_state.logged_in:
     render_auth_screen()
 else:
-    # Her 1 saniyede bir tetiklenen canlı döngü (Arka plan üretimlerini ve otomatik veritabanı kaydını tetikler)
     st_autorefresh(interval=1000, limit=None, key="ticarix_live_clock")
 
     current_t = time.time()
@@ -104,7 +103,6 @@ else:
     update_bank_interest(current_t)
     update_shop_income(current_t)
     
-    # Her döngüde verileri arka planda güvenle veritabanına kaydet
     save_current_game()
 
     # Üst Bilgi Barı (Navbar)
