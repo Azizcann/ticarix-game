@@ -3,7 +3,6 @@ import json
 import time
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
-
 from database import init_db, save_game_data, load_all_clans, is_admin_user, get_admin_buffed_data, DB_FILE
 from auth import render_auth_screen
 from mining import render_mining_tab, update_mining_progress
