@@ -52,7 +52,6 @@ if not st.session_state.logged_in and "uid" in st.query_params:
             if db.is_admin_user(st.session_state.user_id):
                 g_data = db.get_admin_buffed_data(g_data)
             
-            # 🛑 Otomatik girişte de offline süreleri sıfırla
             g_data["active_job"] = None
             g_data["mine_last_time"] = time.time()
             g_data["fish_last_time"] = time.time()
@@ -105,6 +104,21 @@ else:
     # 1 Saniyelik Canlı Otomatik Yenileme
     st_autorefresh(interval=1000, limit=None, key="ticarix_live_clock")
 
+    # 🔄 Veritabanından Anlık Bakiye Senkronizasyonu (Başka oyuncudan para gelirse anında yansısın)
+    try:
+        conn = sqlite3.connect(db.DB_FILE, timeout=10.0)
+        cursor = conn.cursor()
+        cursor.execute("SELECT game_data FROM users WHERE id = ?", (st.session_state.user_id,))
+        sync_row = cursor.fetchone()
+        conn.close()
+        if sync_row:
+            sync_data = json.loads(sync_row[0])
+            if not db.is_admin_user(st.session_state.user_id):
+                st.session_state["money"] = sync_data.get("money", st.session_state.get("money", 0))
+                st.session_state["bank_balance"] = sync_data.get("bank_balance", st.session_state.get("bank_balance", 0))
+    except Exception:
+        pass
+
     # Arka Plan Güncellemeleri
     current_t = time.time()
     try:
@@ -138,7 +152,6 @@ else:
     st.sidebar.markdown(f"🛡️ **Klan:** `{st.session_state.get('user_clan', 'Yok')}`")
     
     if st.sidebar.button("🚪 Çıkış Yap", use_container_width=True):
-        # Çıkışta aktif işleri, kazı/balık ve dükkan gelirini sıfırla
         st.session_state["active_job"] = None
         st.session_state["mine_last_time"] = time.time()
         st.session_state["fish_last_time"] = time.time()
@@ -192,7 +205,6 @@ else:
                 if not alici_adi.strip():
                     st.error("Lütfen bir alıcı kullanıcı adı girin!")
                 else:
-                    # db modülü üzerinden transfer fonksiyonunu çağırıyoruz
                     basarili, mesaj = db.transfer_money(current_user, alici_adi.strip(), gonderilecek_tutar)
                     
                     if basarili:
