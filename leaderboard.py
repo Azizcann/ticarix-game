@@ -4,10 +4,16 @@ import database as db
 def render_leaderboard_tab():
     st.header("🏆 Ticarix Liderlik Tablosu")
 
-    tab_players, tab_clans = st.tabs(["👤 En Zengin Oyuncular (Top 100)", "🛡️ Klan Sıralaması"])
+    # İç içe tab yerine Streamlit uyumlu radio filtresi
+    sub_category = st.radio(
+        "Sıralama Türünü Seçin:",
+        ["👤 En Zengin Oyuncular (Top 100)", "🛡️ Klan Sıralaması"],
+        horizontal=True
+    )
+    st.divider()
 
     # --- OYUNCU SERVET SIRALAMASI ---
-    with tab_players:
+    if sub_category == "👤 En Zengin Oyuncular (Top 100)":
         st.subheader("💰 Oyuncu Servet Sıralaması")
         st.caption("Servet = Nakit Para + Banka Mevduatı + Dükkan Yatırım Değeri - Banka Borcu")
         
@@ -18,14 +24,7 @@ def render_leaderboard_tab():
         else:
             table_data = []
             for idx, p in enumerate(players, start=1):
-                if idx == 1:
-                    rank_str = "🥇 1"
-                elif idx == 2:
-                    rank_str = "🥈 2"
-                elif idx == 3:
-                    rank_str = "🥉 3"
-                else:
-                    rank_str = f"#{idx}"
+                rank_str = "🥇 1" if idx == 1 else "🥈 2" if idx == 2 else "🥉 3" if idx == 3 else f"#{idx}"
 
                 table_data.append({
                     "Sıra": rank_str,
@@ -40,7 +39,7 @@ def render_leaderboard_tab():
             st.dataframe(table_data, use_container_width=True, hide_index=True)
 
     # --- KLAN SIRALAMASI ---
-    with tab_clans:
+    elif sub_category == "🛡️ Klan Sıralaması":
         st.subheader("🛡️ En Güçlü Klanlar")
         st.caption("Klanlar toplam kazandıkları Klan XP'ye göre sıralanır.")
 
@@ -51,14 +50,7 @@ def render_leaderboard_tab():
         else:
             clan_table = []
             for idx, c in enumerate(clans, start=1):
-                if idx == 1:
-                    rank_str = "🥇 1"
-                elif idx == 2:
-                    rank_str = "🥈 2"
-                elif idx == 3:
-                    rank_str = "🥉 3"
-                else:
-                    rank_str = f"#{idx}"
+                rank_str = "🥇 1" if idx == 1 else "🥈 2" if idx == 2 else "🥉 3" if idx == 3 else f"#{idx}"
 
                 clan_table.append({
                     "Sıra": rank_str,
