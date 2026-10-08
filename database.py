@@ -85,7 +85,7 @@ def is_admin_user(user_id):
     cursor.execute("SELECT email FROM users WHERE id = ?", (user_id,))
     row = cursor.fetchone()
     conn.close()
-    return row and row[0] == "azizcanakgul8@gmail.com"
+    return bool(row and row[0] == "azizcanakgul8@gmail.com")
 
 def get_admin_buffed_data(current_data):
     """Admin hesabı için parayı sınırsız yapar."""
@@ -116,7 +116,7 @@ def register_user(username, email, password):
         return False, "Bu kullanıcı adı veya e-posta zaten kullanımda!"
 
 def login_user(identifier, password):
-    """Kullanıcı girişi yapar ve tam sırasıyla (user_id, username, game_data_json) döndürür."""
+    """Kullanıcı girişi yapar ve (user_id, username, game_data_json) döndürür."""
     conn = sqlite3.connect(DB_FILE, timeout=10.0)
     cursor = conn.cursor()
     hashed_p = hash_password(password)
@@ -184,3 +184,32 @@ def save_clan_to_db(clan_name, clan_data):
     conn.close()
 
 def delete_clan_from_db(clan_name):
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM clans WHERE clan_name = ?", (clan_name,))
+    conn.commit()
+    conn.close()
+
+# --- GLOBAL SOHBET FONKSİYONLARI ---
+def save_chat_message(username, message):
+    """Sohbet mesajını kaydeder."""
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO chat_messages (username, message) VALUES (?, ?)",
+        (username, message)
+    )
+    conn.commit()
+    conn.close()
+
+def get_chat_messages(limit=50):
+    """Son sohbet mesajlarını getirir."""
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT username, message, created_at FROM chat_messages ORDER BY id DESC LIMIT ?",
+        (limit,)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return rows[::-1]
