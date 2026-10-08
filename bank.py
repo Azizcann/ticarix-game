@@ -3,7 +3,7 @@ import time
 from database import is_admin_user
 
 def render_bank_tab(save_callback):
-    """Merkez Bankası, mevduat ve kredi işlemlerini yöneten arayüz."""
+    """Merkez Bankası, mevduat ve borç ödeme işlemlerini yöneten arayüz."""
     st.subheader("🏦 Ticarix Merkez Bankası")
     
     col_info1, col_info2, col_info3 = st.columns(3)
@@ -12,7 +12,7 @@ def render_bank_tab(save_callback):
     with col_info2:
         st.metric(label="📈 Bankadaki Mevduat", value=f"{int(st.session_state.bank_balance):,} TL")
     with col_info3:
-        st.metric(label="📉 Aktif Kredi / Borç", value=f"{int(st.session_state.bank_debt):,} TL")
+        st.metric(label="📉 Aktif Borç", value=f"{int(st.session_state.bank_debt):,} TL")
 
     st.info("⏰ **Zaman Algısı:** 1 Gerçek Saat = 1 Oyun Ayı (Faizler bu ölçekte bileşik olarak işler).")
 
@@ -63,16 +63,7 @@ def render_bank_tab(save_callback):
                 st.warning("Bankada yeterli bakiye yok!")
 
     with col_b2:
-        st.markdown("#### Kredi & Borç Yönetimi")
-        kredi_tutari = st.number_input("Çekilecek Kredi (TL)", min_value=0, max_value=5000000, step=10000, key="kredi_inp")
-        if st.button("Kredi Çek (Faizli Geri Ödemeli)", use_container_width=True):
-            if kredi_tutari > 0:
-                st.session_state.money += kredi_tutari
-                st.session_state.bank_debt += kredi_tutari
-                save_callback()
-                st.success("Kredi çekildi. Borca saatlik ölçekli aylık faiz işlemeye başladı!")
-                st.rerun()
-
+        st.markdown("#### Borç Yönetimi")
         max_borc_odeme = int(min(st.session_state.money, st.session_state.bank_debt))
         borc_odeme = st.number_input("Ödenecek Tutar (TL)", min_value=0, max_value=max_borc_odeme, step=100, key="borc_inp")
         if st.button("Borcu Kapat / Öde", use_container_width=True):
