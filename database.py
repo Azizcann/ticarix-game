@@ -1,20 +1,30 @@
-import sqlite3
 import hashlib
 import json
 import time
 import os
+import psycopg2
+import psycopg2.extras
+import streamlit as st
 
-DB_FILE = "ticarix_users.db"
+def get_db_connection():
+    """Streamlit secrets üzerinden PostgreSQL (Supabase) bağlantısı kurar."""
+    db_url = st.secrets.get("DATABASE_URL")
+    if not db_url:
+        # Yerel testler için fallback (Eğer secret tanımlı değilse hata vermemesi adına)
+        raise ValueError("Streamlit Secrets içerisinde 'DATABASE_URL' bulunamadı!")
+    
+    conn = psycopg2.connect(db_url, sslmode='require')
+    return conn
 
 def init_db():
-    """Veritabanını ve gerekli tüm tabloları sıfırdan/kontrol ederek oluşturur."""
-    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    """Veritabanını ve gerekli tüm tabloları PostgreSQL uyumlu olarak oluşturur."""
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     # 1. Kullanıcılar Tablosu
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
@@ -33,7 +43,7 @@ def init_db():
     # 3. Genel Sohbet Tablosu
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS chat_messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             username TEXT NOT NULL,
             message TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -41,6 +51,7 @@ def init_db():
     ''')
     
     conn.commit()
+    cursor.close()
     conn.close()
 
 def hash_password(password):
@@ -61,7 +72,7 @@ def get_default_game_data():
         "clan_members": 1,
         "accumulated_shop_money": 0,
         "active_job": None,
-        "profile_pic": None,  # 👈 Profil fotoğrafı yolu eklendi
+        "profile_pic": None,
         "mine_level": 1,
         "mine_xp": 0,
         "mine_inventory": {"Kömür": 0, "Bakır": 0, "Demir": 0, "Gümüş": 0, "Altın": 0, "Elmas": 0},
@@ -81,10 +92,11 @@ def is_admin_user(user_id):
     """Kullanıcının admin/kurucu hesap olup olmadığını kontrol eder."""
     if not user_id:
         return False
-    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT email FROM users WHERE id = ?", (user_id,))
+    cursor.execute("SELECT email FROM users WHERE id = %s", (user_id,))
     row = cursor.fetchone()
+    cursor.close()
     conn.close()
     return bool(row and row[0] == "azizcanakgul8@gmail.com")
 
@@ -98,7 +110,7 @@ def get_admin_buffed_data(current_data):
 def register_user(username, email, password):
     """Yeni kullanıcı kaydı yapar."""
     try:
-        conn = sqlite3.connect(DB_FILE, timeout=10.0)
+        conn = get_db_connection()
         cursor = conn.cursor()
         hashed_p = hash_password(password)
         initial_data = get_default_game_data()
@@ -108,23 +120,25 @@ def register_user(username, email, password):
 
         initial_data_json = json.dumps(initial_data, ensure_ascii=False)
         
-        cursor.execute("INSERT INTO users (username, email, password_hash, game_data) VALUES (?, ?, ?, ?)",
+        cursor.execute("INSERT INTO users (username, email, password_hash, game_data) VALUES (%s, %s, %s, %s)",
                        (username, email, hashed_p, initial_data_json))
         conn.commit()
+        cursor.close()
         conn.close()
         return True, "Kayıt başarılı!"
-    except sqlite3.IntegrityError:
+    except Exception as e:
         return False, "Bu kullanıcı adı veya e-posta zaten kullanımda!"
 
 def login_user(identifier, password):
     """Kullanıcı girişi yapar ve (user_id, username, game_data_json) döndürür."""
-    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    conn = get_db_connection()
     cursor = conn.cursor()
     hashed_p = hash_password(password)
     
-    cursor.execute("SELECT id, username, game_data, email FROM users WHERE (username = ? OR email = ?) AND password_hash = ?", 
+    cursor.execute("SELECT id, username, game_data, email FROM users WHERE (username = %s OR email = %s) AND password_hash = %s", 
                    (identifier, identifier, hashed_p))
     user = cursor.fetchone()
+    cursor.close()
     conn.close()
     
     if user:
@@ -134,10 +148,11 @@ def login_user(identifier, password):
             g_data = get_admin_buffed_data(g_data)
             g_data_json = json.dumps(g_data, ensure_ascii=False)
             
-            conn = sqlite3.connect(DB_FILE, timeout=10.0)
+            conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("UPDATE users SET game_data = ? WHERE id = ?", (g_data_json, user_id))
+            cursor.execute("UPDATE users SET game_data = %s WHERE id = %s", (g_data_json, user_id))
             conn.commit()
+            cursor.close()
             conn.close()
             
         return (user_id, username, g_data_json)
@@ -152,20 +167,22 @@ def save_game_data(user_id, data):
         data = get_admin_buffed_data(data)
         
     try:
-        conn = sqlite3.connect(DB_FILE, timeout=10.0)
+        conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("UPDATE users SET game_data = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), user_id))
+        cursor.execute("UPDATE users SET game_data = %s WHERE id = %s", (json.dumps(data, ensure_ascii=False), user_id))
         conn.commit()
+        cursor.close()
         conn.close()
     except Exception as e:
         print(f"Kayıt Hatası: {e}")
 
 # --- GLOBAL KLAN FONKSİYONLARI ---
 def load_all_clans():
-    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT clan_name, clan_data FROM clans")
     rows = cursor.fetchall()
+    cursor.close()
     conn.close()
     
     clans_dict = {}
@@ -177,56 +194,61 @@ def load_all_clans():
     return clans_dict
 
 def save_clan_to_db(clan_name, clan_data):
-    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO clans (clan_name, clan_data) VALUES (?, ?)",
+    cursor.execute("INSERT INTO clans (clan_name, clan_data) VALUES (%s, %s) ON CONFLICT (clan_name) DO UPDATE SET clan_data = EXCLUDED.clan_data",
                    (clan_name, json.dumps(clan_data, ensure_ascii=False)))
     conn.commit()
+    cursor.close()
     conn.close()
 
 def delete_clan_from_db(clan_name):
-    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM clans WHERE clan_name = ?", (clan_name,))
+    cursor.execute("DELETE FROM clans WHERE clan_name = %s", (clan_name,))
     conn.commit()
+    cursor.close()
     conn.close()
 
 # --- GLOBAL SOHBET FONKSİYONLARI ---
 def save_chat_message(username, message):
     """Sohbet mesajını kaydeder."""
-    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO chat_messages (username, message) VALUES (?, ?)",
+        "INSERT INTO chat_messages (username, message) VALUES (%s, %s)",
         (username, message)
     )
     conn.commit()
+    cursor.close()
     conn.close()
 
 def get_chat_messages(limit=50):
     """Sohbet mesajlarını silinmeden, geçmişe dönük olarak getirir."""
-    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     cursor.execute(
         """
         SELECT username, message, created_at 
         FROM chat_messages 
-        ORDER BY id DESC LIMIT ?
+        ORDER BY id DESC LIMIT %s
         """,
         (limit,)
     )
     rows = cursor.fetchall()
+    cursor.close()
     conn.close()
     return rows[::-1]
 
 # --- SIRALAMA (LİDERLİK TABLOSU) FONKSİYONLARI ---
 def get_top_players(limit=100):
-    """Oyuncuların servetini hesaplayıp ilk 100'ü döndürür[cite: 4]."""
-    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    """Oyuncuların servetini hesaplayıp ilk 100'ü döndürür."""
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT username, game_data FROM users")
     rows = cursor.fetchall()
+    cursor.close()
     conn.close()
 
     leaderboard = []
@@ -264,11 +286,12 @@ def get_top_players(limit=100):
 
 
 def get_top_clans(limit=100):
-    """Klanları XP değerine göre sıralar[cite: 4]."""
-    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    """Klanları XP değerine göre sıralar."""
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT clan_name, clan_data FROM clans")
     rows = cursor.fetchall()
+    cursor.close()
     conn.close()
 
     clan_list = []
@@ -294,20 +317,22 @@ def get_top_clans(limit=100):
 
 
 def transfer_money(sender_username, receiver_username, amount):
-    """Bir oyuncudan diğerine güvenli para transferi yapar[cite: 4]."""
+    """Bir oyuncudan diğerine güvenli para transferi yapar."""
     if amount <= 0:
         return False, "Gönderilecek tutar 0'dan büyük olmalıdır!"
         
     if sender_username.lower() == receiver_username.lower():
         return False, "Kendine para gönderemezsin!"
 
-    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
-        cursor.execute("SELECT id, game_data, email FROM users WHERE username = ?", (sender_username,))
+        cursor.execute("SELECT id, game_data, email FROM users WHERE username = %s", (sender_username,))
         sender_row = cursor.fetchone()
         if not sender_row:
+            cursor.close()
+            conn.close()
             return False, "Gönderen hesap bulunamadı!"
             
         sender_id, sender_g_json, sender_email = sender_row
@@ -316,14 +341,18 @@ def transfer_money(sender_username, receiver_username, amount):
         if sender_email != "azizcanakgul8@gmail.com":
             sender_money = sender_data.get("money", 0)
             if sender_money < amount:
+                cursor.close()
+                conn.close()
                 return False, f"Yetersiz nakit! Cüzdanında {sender_money:,} TL var."
             sender_data["money"] -= amount
         else:
             sender_data = get_admin_buffed_data(sender_data)
             
-        cursor.execute("SELECT id, game_data, email FROM users WHERE username = ?", (receiver_username,))
+        cursor.execute("SELECT id, game_data, email FROM users WHERE username = %s", (receiver_username,))
         receiver_row = cursor.fetchone()
         if not receiver_row:
+            cursor.close()
+            conn.close()
             return False, f"'{receiver_username}' adında kayıtlı bir oyuncu bulunamadı! Para boşa gitmedi."
             
         receiver_id, receiver_g_json, receiver_email = receiver_row
@@ -334,14 +363,16 @@ def transfer_money(sender_username, receiver_username, amount):
         else:
             receiver_data["money"] = receiver_data.get("money", 0) + amount
         
-        cursor.execute("UPDATE users SET game_data = ? WHERE id = ?", (json.dumps(sender_data, ensure_ascii=False), sender_id))
-        cursor.execute("UPDATE users SET game_data = ? WHERE id = ?", (json.dumps(receiver_data, ensure_ascii=False), receiver_id))
+        cursor.execute("UPDATE users SET game_data = %s WHERE id = %s", (json.dumps(sender_data, ensure_ascii=False), sender_id))
+        cursor.execute("UPDATE users SET game_data = %s WHERE id = %s", (json.dumps(receiver_data, ensure_ascii=False), receiver_id))
         
         conn.commit()
+        cursor.close()
+        conn.close()
         return True, f"Başarıyla {receiver_username} adlı oyuncuya {amount:,} TL gönderildi!"
         
     except Exception as e:
         conn.rollback()
-        return False, f"Transfer sırasında bir hata oluştu: {e}"
-    finally:
+        cursor.close()
         conn.close()
+        return False, f"Transfer sırasında bir hata oluştu: {e}"
